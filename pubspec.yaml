@@ -1,0 +1,26 @@
+name: bottlebottle
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  audioplayers: ^6.8.1
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # 효과음. tool/make_sounds.py 로 직접 합성해 만든 파일이다.
+  # 외부 음원을 쓰지 않으므로 라이선스를 따질 것이 없다.
+  assets:
+    - assets/audio/
