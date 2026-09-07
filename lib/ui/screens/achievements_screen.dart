@@ -33,15 +33,20 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
 
   PlayStats get _stats => widget.stats;
 
+  /// 이미 얻어 둔 것들. 날짜가 적혀 있다는 것이 곧 얻었다는 뜻이다.
+  Set<String> get _earned => widget.earnedOn.keys.toSet();
+
+  bool _has(Achievement a) => Achievements.isEarned(a, _stats, _earned);
+
   @override
   Widget build(BuildContext context) {
     final all = Achievements.all;
-    final earned = Achievements.earnedIn(_stats);
+    final earned = Achievements.earnedIn(_stats, _earned);
 
     final shown = [
       for (final a in all)
         if ((_filter == null || a.group == _filter) &&
-            !(_onlyRemaining && a.isEarnedBy(_stats)))
+            !(_onlyRemaining && _has(a)))
           a,
     ];
 
@@ -170,7 +175,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
 
   Widget _tierChip(BuildContext context, AchievementTier tier, String name) {
     final items = [for (final a in Achievements.all) if (a.tier == tier) a];
-    final done = items.where((a) => a.isEarnedBy(_stats)).length;
+    final done = items.where(_has).length;
     final tint = achievementTierColor(tier);
 
     return Container(
@@ -205,7 +210,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   Widget _almostThere(BuildContext context) {
     final close = [
       for (final a in Achievements.all)
-        if (!a.isEarnedBy(_stats) && a.progress(_stats) > 0) a,
+        if (!_has(a) && a.progress(_stats) > 0) a,
     ]..sort((a, b) => b.ratio(_stats).compareTo(a.ratio(_stats)));
 
     if (close.isEmpty) return const SizedBox.shrink();
@@ -259,7 +264,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
     List<Achievement> items,
     Color tint,
   ) {
-    final done = items.where((a) => a.isEarnedBy(_stats)).length;
+    final done = items.where(_has).length;
     // 막대를 누르면 그 묶음만 본다. 목록이 29개라 훑기만 해서는 길다.
     return InkWell(
       borderRadius: BorderRadius.circular(10),

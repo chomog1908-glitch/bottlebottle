@@ -53,7 +53,9 @@ class AchievementTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final earned = achievement.isEarnedBy(stats);
+    // 날짜가 적혀 있으면 그때 얻은 것이다. 지금 기준을 못 넘어도 얻은 것으로 본다.
+    // 한 번 드린 것을 목표를 손댔다는 이유로 도로 가져가지 않는다.
+    final earned = earnedOn != null || achievement.isEarnedBy(stats);
     final tint = achievementTierColor(achievement.tier);
     final progress = achievement.progress(stats);
 

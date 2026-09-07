@@ -636,18 +636,46 @@ class Achievements {
   static Achievement byId(String id) => all.firstWhere((a) => a.id == id);
 
   /// [stats] 기준으로 얻은 도전과제들.
-  static List<Achievement> earnedIn(PlayStats stats) =>
-      [for (final a in all) if (a.isEarnedBy(stats)) a];
+  ///
+  /// [alreadyEarned]에 든 것은 지금 기준을 못 넘어도 **얻은 것으로 친다.**
+  /// 한 번 드린 것을 도로 가져가지 않기 위해서다. 자세한 이유는 [isEarned] 참고.
+  static List<Achievement> earnedIn(PlayStats stats,
+          [Set<String> alreadyEarned = const {}]) =>
+      [for (final a in all) if (isEarned(a, stats, alreadyEarned)) a];
 
-  static Set<String> earnedIds(PlayStats stats) =>
-      {for (final a in earnedIn(stats)) a.id};
+  /// 이 도전과제를 얻었는가.
+  ///
+  /// 기록으로 계산한 결과 **또는** 예전에 얻어 둔 것. 둘 중 하나면 얻은 것이다.
+  ///
+  /// 계산만으로 판단하면, 나중에 목표를 손대는 순간(예: "50판"을 "60판"으로)
+  /// **이미 드린 도전과제가 조용히 취소된다.** 날짜는 남아 있는데 배지만 꺼진다.
+  /// 어머니가 427판을 푸시며 모으신 것을 내 사정으로 도로 가져가는 셈이다.
+  ///
+  /// 그래서 얻은 것은 저장해 두고, 계산 결과와 **합집합**으로 본다.
+  /// 목표를 낮추면 새로 얻고, 올려도 이미 얻은 것은 그대로 남는다.
+  static bool isEarned(
+    Achievement a,
+    PlayStats stats, [
+    Set<String> alreadyEarned = const {},
+  ]) =>
+      alreadyEarned.contains(a.id) || a.isEarnedBy(stats);
+
+  static Set<String> earnedIds(PlayStats stats,
+          [Set<String> alreadyEarned = const {}]) =>
+      {for (final a in earnedIn(stats, alreadyEarned)) a.id};
 
   /// [before]에서 [after]로 오면서 **새로 얻은** 것들.
   ///
   /// 화면에 축하를 띄우는 데 쓴다. 목록 순서를 유지해 항상 같은 순서로 보여준다.
-  static List<Achievement> newlyEarned(PlayStats before, PlayStats after) => [
+  /// [alreadyEarned]에 든 것은 새로 얻은 것이 아니다. 축하를 두 번 띄우지 않는다.
+  static List<Achievement> newlyEarned(
+    PlayStats before,
+    PlayStats after, [
+    Set<String> alreadyEarned = const {},
+  ]) =>
+      [
         for (final a in all)
-          if (!a.isEarnedBy(before) && a.isEarnedBy(after)) a,
+          if (!isEarned(a, before, alreadyEarned) && a.isEarnedBy(after)) a,
       ];
 
   /// 그룹별로 나눈 목록. 화면에서 칸을 나누는 데 쓴다.

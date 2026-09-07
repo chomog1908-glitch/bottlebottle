@@ -244,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (
         Icons.emoji_events_outlined,
         '도전과제',
-        '${Achievements.earnedIn(_stats).length} / ${Achievements.all.length} 달성',
+        '${Achievements.earnedIn(_stats, _earnedOn.keys.toSet()).length} / ${Achievements.all.length} 달성',
         const Color(0xFFF9A825),
         () => _open(AchievementsScreen(stats: _stats, earnedOn: _earnedOn)),
       ),

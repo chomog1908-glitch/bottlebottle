@@ -31,10 +31,31 @@ class AchievementTracker {
     earnedOn = await _storage.loadAchievementDates();
     _cleared = await _storage.loadClearedLevels();
     _loaded = true;
+
+    // 기록상 이미 넘어선 것 가운데 날짜가 없는 것을 채워 둔다.
+    //
+    // 예전 저장에는 계산으로만 켜지던 것들이 있어 날짜가 비어 있다. 지금 적어
+    // 두어야 나중에 목표를 손대도 그대로 남는다. 날짜는 오늘로 적을 수밖에
+    // 없지만, 배지가 꺼지는 것보다는 날짜가 늦은 편이 낫다.
+    final missing = [
+      for (final a in Achievements.all)
+        if (a.isEarnedBy(stats) && !earnedOn.containsKey(a.id)) a.id,
+    ];
+    if (missing.isNotEmpty) {
+      final day = _today();
+      await _storage.recordAchievements(missing, day);
+      earnedOn = {...earnedOn, for (final id in missing) id: day};
+    }
   }
 
+  /// 이미 얻어 둔 도전과제의 이름들.
+  ///
+  /// 날짜가 적혀 있다는 것이 곧 그때 얻었다는 뜻이다. 따로 목록을 두지 않고
+  /// 이걸 쓴다 — 두 곳에 적으면 언젠가 서로 어긋난다.
+  Set<String> get earnedIds => earnedOn.keys.toSet();
+
   /// 얻은 도전과제 수 / 전체 수.
-  int get earnedCount => Achievements.earnedIn(stats).length;
+  int get earnedCount => Achievements.earnedIn(stats, earnedIds).length;
 
   int get totalCount => Achievements.all.length;
 
@@ -70,7 +91,7 @@ class AchievementTracker {
     stats = next;
     await _storage.saveStats(stats);
 
-    final fresh = Achievements.newlyEarned(before, stats);
+    final fresh = Achievements.newlyEarned(before, stats, earnedIds);
     if (fresh.isNotEmpty) {
       final day = _today();
       await _storage.recordAchievements([for (final a in fresh) a.id], day);

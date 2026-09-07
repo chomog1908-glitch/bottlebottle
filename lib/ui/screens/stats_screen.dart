@@ -112,7 +112,7 @@ class StatsScreen extends StatelessWidget {
   }
 
   Widget _rings(BuildContext context) {
-    final earned = Achievements.earnedIn(stats).length;
+    final earned = Achievements.earnedIn(stats, earnedOn.keys.toSet()).length;
     final total = Achievements.all.length;
     final solo = StatsSummary.soloRatio(
       clearedCount: stats.clearedCount,
@@ -262,7 +262,7 @@ class StatsScreen extends StatelessWidget {
   ///
   /// 날짜를 모르는 것은 뒤로 보낸다. 예전 저장에는 날짜가 없을 수 있다.
   Widget _recentAchievements(BuildContext context) {
-    final earned = Achievements.earnedIn(stats);
+    final earned = Achievements.earnedIn(stats, earnedOn.keys.toSet());
     if (earned.isEmpty) {
       return StatCard(
         title: '최근 도전과제',
