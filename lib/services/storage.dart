@@ -34,6 +34,7 @@ class Storage {
   static const String _keySound = 'sound_on_v1';
   static const String _keyLargeText = 'large_text_v1';
   static const String _keyTheme = 'theme_mode_v1';
+  static const String _keySeenNotes = 'seen_rule_notes_v1';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -95,6 +96,22 @@ class Storage {
     if (list.contains(key)) return;
     list.add(key);
     await p.setStringList(_keyCleared, list);
+  }
+
+  /// 이미 보여준 규칙 안내의 이름들.
+  ///
+  /// 안내 카드는 **처음 한 번만** 뜬다. 매번 뜨면 잔소리가 되고, 잔소리는
+  /// 읽지 않고 닫게 된다. 다시 보고 싶으면 화면 위 ⓘ 단추가 있다.
+  Future<Set<String>> loadSeenRuleNotes() async =>
+      ((await _prefs).getStringList(_keySeenNotes) ?? const []).toSet();
+
+  /// 규칙 안내를 보여줬다고 기록한다.
+  Future<void> markRuleNoteSeen(String id) async {
+    final p = await _prefs;
+    final list = p.getStringList(_keySeenNotes) ?? <String>[];
+    if (list.contains(id)) return;
+    list.add(id);
+    await p.setStringList(_keySeenNotes, list);
   }
 
   /// 지금까지 쌓인 기록. 저장이 없거나 깨졌으면 빈 기록으로 시작한다.
@@ -169,6 +186,7 @@ class Storage {
         _keySound: p.getBool(_keySound),
         _keyLargeText: p.getBool(_keyLargeText),
         _keyTheme: p.getString(_keyTheme),
+        _keySeenNotes: p.getStringList(_keySeenNotes),
       },
     });
   }

@@ -36,6 +36,7 @@ BoardMetrics computeBoardMetrics({
   required Size available,
   required int bottleCount,
   required int capacity,
+  int? fixedPerRow,
   double horizontalGap = 12,
   double verticalGap = 16,
   double maxBottleWidth = 58,
@@ -43,6 +44,27 @@ BoardMetrics computeBoardMetrics({
   double minBottleWidth = 16,
   double minUnitHeight = 7,
 }) {
+  // 이웃 제한이 걸린 판에서는 **줄 수를 화면이 정하면 안 된다.**
+  //
+  // "가로 세 칸까지 닿는다"는 규칙은 격자를 전제한다. 그런데 배치를 화면 크기에
+  // 맡기면 큰 폰에서는 한 줄에 8개, 작은 폰에서는 4개가 되어 **같은 레벨인데
+  // 폰마다 닿는 병이 달라진다.** 규칙이 말하는 격자와 눈에 보이는 격자가
+  // 어긋나면, 바로 옆에 있는 병에 못 붓는 일이 생긴다. 그건 버그로 보인다.
+  //
+  // 그래서 규칙이 격자를 정한 판은 그 줄 수를 그대로 쓰고, 크기만 화면에 맞춘다.
+  if (fixedPerRow != null && fixedPerRow > 0) {
+    final rows = (bottleCount / fixedPerRow).ceil();
+    final width =
+        min(available.width / fixedPerRow - horizontalGap, maxBottleWidth);
+    final unit = min(available.height / rows - verticalGap, maxUnitHeight * capacity) / capacity;
+    return BoardMetrics(
+      rows: rows,
+      perRow: fixedPerRow,
+      bottleWidth: max(width, minBottleWidth),
+      unitHeight: max(min(unit, maxUnitHeight), minUnitHeight),
+    );
+  }
+
   BoardMetrics? best;
 
   // 줄 수를 하나씩 늘려 보며 가장 크게 그릴 수 있는 배치를 고른다.

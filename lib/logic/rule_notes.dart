@@ -6,6 +6,8 @@
 /// 화면 위 ⓘ 단추로 언제든 다시 볼 수 있게 한다.
 library;
 
+import '../model/rule_set.dart';
+
 /// 특별 규칙 하나에 대한 안내.
 class RuleNote {
   /// 안내 카드를 한 번 보여줬는지 기억할 때 쓰는 이름.
@@ -67,6 +69,17 @@ class RuleNotes {
     detail: '그 병을 완전히 비우면 다시 아무 색이나 담을 수 있습니다.\n'
         '색을 섞어 두는 것이 오히려 자유로울 때가 있습니다.',
   );
+
+  /// [rules]에 해당하는 안내를 모아 준다. 규칙이 없으면 빈 목록.
+  ///
+  /// 순서가 곧 읽는 순서다. 이웃 제한을 먼저 두는 이유: 그건 어디로 부을 수
+  /// 있는지에 대한 것이라 판을 보는 방식 자체를 바꾼다. 잠금은 그 다음이다.
+  static List<RuleNote> forRules(RuleSet rules) => [
+        if (rules.hasReachLimit) reach(rules.reachX, rules.reachY),
+        if (rules.claimEmpties) emptyClaimed,
+        if (rules.claimMono) monoLocked,
+        if (rules.lockEmptyOrigin) noTakeBack,
+      ];
 
   /// 트릭 C — 빈 병 출신은 가득 차기 전까지 되뺄 수 없다.
   static const RuleNote noTakeBack = RuleNote(

@@ -51,6 +51,21 @@ void main() {
     }
   });
 
+  test('규칙 구간도 한 판 만드는 데 오래 걸리지 않는다', () {
+    // 레벨을 넘길 때마다 몇 초씩 멈추면 게임이 못 쓰게 된다.
+    //
+    // 이건 실제로 걸렸다. ±2 구간을 색14 깊이7로 두었더니 한 판에 최대 3.8초가
+    // 걸렸고, 10판 중 2판은 아예 안 만들어졌다. 규칙이 조여들 때 판을 한 단계
+    // 낮추면(색13 깊이6) 평균 0.19초로 떨어진다.
+    for (final lv in [750, 900, 1050, 1200, 1450, 1750, 2050, 2500]) {
+      final sw = Stopwatch()..start();
+      LevelGenerator.generate(lv);
+      sw.stop();
+      expect(sw.elapsedMilliseconds, lessThan(2000),
+          reason: '레벨 $lv 생성에 ${sw.elapsedMilliseconds}ms 걸렸습니다.');
+    }
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   test('규칙 구간의 판은 충분히 헝클어져 있다', () {
     // 규칙만 어렵고 판은 싱거우면 규칙이 장식이 된다.
     // (실제로 ±3을 색15 깊이8에 그대로 걸었더니 8판 중 2판이 기준 미달이었다.)

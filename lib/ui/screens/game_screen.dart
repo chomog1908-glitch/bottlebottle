@@ -5,14 +5,18 @@ import 'package:flutter/services.dart';
 
 import '../../controller/game_controller.dart';
 import '../../controller/settings_controller.dart';
+import '../../logic/rule_notes.dart';
+import '../../model/rule_set.dart';
 import '../../services/achievement_tracker.dart';
 import '../../services/audio.dart';
 import '../../services/storage.dart';
+import '../theme/palette.dart';
 import '../widgets/achievement_toast.dart';
 import '../widgets/board_layout.dart';
 import '../widgets/bottle_widget.dart';
 import '../widgets/confetti.dart';
 import '../widgets/pour_overlay.dart';
+import '../widgets/rule_note_card.dart';
 import 'achievements_screen.dart';
 import 'difficulty_screen.dart';
 import 'settings_screen.dart';
@@ -69,6 +73,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final GlobalKey _boardKey = GlobalKey();
   List<GlobalKey> _bottleKeys = [];
 
+  /// 이미 보여준 규칙 안내의 이름들. 같은 안내를 두 번 띄우지 않는다.
+  Set<String> _seenNotes = {};
+
+  /// 안내를 마지막으로 확인한 규칙. 레벨이 바뀌어도 규칙이 같으면 다시 보지 않는다.
+  RuleSet? _notedRules;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +91,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // 홈에서 "레벨 고르기"로 들어온 경우가 여기다.
     final saved = widget.startLevel == null ? await _storage.loadGame() : null;
     await _achievements.load();
+    _seenNotes = await _storage.loadSeenRuleNotes();
 
     final c = GameController(startLevel: widget.startLevel ?? 1);
     // 복원은 **기록에 넣지 않는다.** 이미 세어 둔 수를 다시 세게 된다.
@@ -94,6 +105,34 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _controller = c;
       _shownSelected = c.selected;
     });
+    _maybeShowRuleNotes(c);
+  }
+
+  /// 이 판에 처음 보는 규칙이 있으면 안내를 한 번 띄운다.
+  ///
+  /// 레벨이 아니라 **규칙**을 기준으로 기억한다. 같은 규칙이 150레벨 이어지는데
+  /// 레벨마다 띄우면 잔소리가 된다. 규칙이 새로 붙을 때만 뜬다.
+  Future<void> _maybeShowRuleNotes(GameController c) async {
+    final rules = c.state.rules;
+    if (rules == _notedRules) return;
+    _notedRules = rules;
+
+    final unseen = [
+      for (final n in RuleNotes.forRules(rules))
+        if (!_seenNotes.contains(n.id)) n,
+    ];
+    if (unseen.isEmpty) return;
+
+    // 판이 그려진 뒤에 띄운다. 화면이 뜨기도 전에 덮으면 무엇에 대한 말인지 모른다.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    if (!mounted) return;
+
+    for (final n in unseen) {
+      _seenNotes.add(n.id);
+      await _storage.markRuleNoteSeen(n.id);
+    }
+    if (!mounted) return;
+    await RuleNoteSheet.show(context, unseen, title: '새로운 규칙');
   }
 
   @override
@@ -147,6 +186,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _onControllerChanged() {
     final c = _controller!;
+
+    // 레벨이 바뀌어 새 규칙이 붙었으면 안내를 띄운다.
+    // (다음 레벨로 가거나 레벨을 골라 들어온 경우가 여기다.)
+    if (c.state.rules != _notedRules) _maybeShowRuleNotes(c);
 
     // 병을 새로 집었으면 집는 소리를 낸다.
     if (c.selected != null && c.selected != _shownSelected) {
@@ -268,6 +311,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ),
         title: Text('레벨 ${c.level}  ·  ${c.config.difficultyLabel}'),
         actions: [
+          // 규칙이 붙은 판에서만 나타난다. 설명할 것이 없으면 단추도 없다.
+          if (RuleNotes.forRules(c.state.rules).isNotEmpty)
+            IconButton(
+              onPressed: () => RuleNoteSheet.show(
+                  context, RuleNotes.forRules(c.state.rules)),
+              icon: const Icon(Icons.info_outline),
+              tooltip: '이 판의 규칙',
+            ),
           IconButton(
             onPressed: _openAchievements,
             icon: const Icon(Icons.emoji_events_outlined),
@@ -301,6 +352,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
+  /// 지금 들고 있는 병에서 [i]로 부을 수 없는가.
+  ///
+  /// 아무것도 안 들고 있으면 어둡게 하지 않는다. 판 전체가 어두워지면
+  /// 무엇이 문제인지가 아니라 화면이 고장 난 것처럼 보인다.
+  bool _isUnreachable(GameController c, int i) {
+    final from = c.selected;
+    if (from == null || from == i) return false;
+    if (!c.state.rules.hasReachLimit && !c.state.rules.hasLocks) return false;
+    return !c.state.canPour(from, i);
+  }
+
+  /// [i]번 병이 전용으로 굳은 색. 잠기지 않았으면 null.
+  Color? _lockedColorOf(GameController c, int i) {
+    final locked = c.state.claimedColor(i);
+    return locked == null ? null : Palette.liquid(locked);
+  }
+
   Widget _board(GameController c) {
     // 병 개수와 깊이는 레벨마다 다르므로 남은 공간에 맞춰 크기를 정한다.
     return LayoutBuilder(
@@ -312,6 +380,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           ),
           bottleCount: c.state.bottleCount,
           capacity: c.state.capacity,
+          // 규칙이 격자를 정한 판은 그 줄 수를 그대로 쓴다.
+          // 그래야 "가까운 병"이 눈에 보이는 그대로가 된다.
+          fixedPerRow:
+              c.state.rules.hasReachLimit ? c.state.rules.gridPerRow : null,
         );
 
         // 계산한 줄 수대로 병을 나눠 담는다.
@@ -365,6 +437,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                     // 붓는 동안 이 자리의 병은 감춘다.
                                     // 기울어진 사본이 대신 그려지기 때문이다.
                                     dimmed: _pour?.from == i,
+                                    // 병을 들고 있을 때, 그 병에서 부을 수 없는
+                                    // 병은 어둡게 한다. 눌러 보고 안 되는 것보다
+                                    // 누르기 전에 보이는 편이 낫다.
+                                    unreachable: _isUnreachable(c, i),
+                                    // 전용으로 굳은 병은 그 색으로 테두리를 두른다.
+                                    lockedColor: _lockedColorOf(c, i),
                                     onTap: () => _tap(c, i),
                                   ),
                               ],
