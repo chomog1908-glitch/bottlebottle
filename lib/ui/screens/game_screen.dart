@@ -355,15 +355,31 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
-  /// 지금 들고 있는 병에서 [i]로 부을 수 없는가.
+  /// 지금 들고 있는 병에서 [i]까지 **손이 닿지 않는가.**
   ///
-  /// 아무것도 안 들고 있으면 어둡게 하지 않는다. 판 전체가 어두워지면
-  /// 무엇이 문제인지가 아니라 화면이 고장 난 것처럼 보인다.
+  /// 어둡게 하는 것은 오직 **새 규칙 때문에** 못 두는 경우뿐이다.
+  /// 색이 안 맞거나 병이 가득 찬 것은 이 게임이 처음부터 가지고 있던 규칙이고,
+  /// 어머니는 그걸 이미 700판 동안 몸으로 아신다. 그것까지 어둡게 하면
+  /// **못 두는 수를 전부 지워버리는 셈**이라, 새 규칙이 무엇인지 보이지 않는다.
+  ///
+  /// (실제로 그렇게 만들었더니 병 하나를 집었을 때 멀어서 어두운 병 3개에
+  ///  다른 이유로 어두운 병 12개가 섞여, 판 전체가 꺼진 것처럼 보였다.)
+  ///
+  /// 아무것도 안 들고 있으면 어둡게 하지 않는다.
   bool _isUnreachable(GameController c, int i) {
     final from = c.selected;
     if (from == null || from == i) return false;
-    if (!c.state.rules.hasReachLimit && !c.state.rules.hasLocks) return false;
-    return !c.state.canPour(from, i);
+    final rules = c.state.rules;
+
+    // 멀어서 닿지 않는다.
+    if (rules.hasReachLimit && !rules.reaches(from, i)) return true;
+
+    // 잠긴 병이라 이 색을 받지 않는다. 이것도 새 규칙이므로 알려준다.
+    final lock = c.state.claimedColor(i);
+    final top = c.state.topColor(from);
+    if (lock != null && top != null && lock != top) return true;
+
+    return false;
   }
 
   /// [i]번 병이 전용으로 굳은 색. 잠기지 않았으면 null.

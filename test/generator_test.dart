@@ -21,14 +21,27 @@ void main() {
     });
 
     test('새 규칙이 들어올 때는 판이 작아졌다가 다시 커진다', () {
-      // 트릭 A가 시작되는 1301에서 판이 작아지고, 구간 안에서 다시 커져야 한다.
-      final before = LevelConfig.forLevel(1300);
-      final at = LevelConfig.forLevel(1301);
-      final later = LevelConfig.forLevel(1600);
-      expect(at.totalUnits, lessThan(before.totalUnits),
-          reason: '새 규칙이 들어오는데 판이 줄지 않았다');
-      expect(later.totalUnits, greaterThan(at.totalUnits),
-          reason: '줄어든 판이 다시 커지지 않았다');
+      // 규칙과 크기를 한꺼번에 올리면 난이도가 계단이 아니라 절벽이 된다.
+      // 그래서 새 규칙이 붙는 구간은 작게 시작해 안에서 커진다.
+      //
+      // 구간 경계 하나만 콕 집어 재지 않는다. 이웃 제한 구간이 이미 판을
+      // 줄여 놓았으면 다음 구간이 그보다 더 작을 이유가 없기 때문이다.
+      // 확인할 것은 **구간 안에서 커지는가**이다.
+      for (final band in [
+        [1301, 1600],
+        [1601, 1900],
+        [1901, 2200],
+      ]) {
+        final start = LevelConfig.forLevel(band[0]);
+        final end = LevelConfig.forLevel(band[1]);
+        expect(end.totalUnits, greaterThan(start.totalUnits),
+            reason: '레벨 ${band[0]}~${band[1]} 구간에서 판이 커지지 않는다');
+      }
+
+      // 700을 넘어설 때는 반드시 작아진다. 규칙이 처음 붙는 자리이기 때문이다.
+      expect(LevelConfig.forLevel(701).totalUnits,
+          lessThan(LevelConfig.forLevel(700).totalUnits),
+          reason: '첫 규칙이 붙는데 판이 줄지 않았다');
     });
 
     test('총 칸 수는 전반적으로 늘어난다', () {

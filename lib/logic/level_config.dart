@@ -123,18 +123,31 @@ class LevelConfig {
   /// 그마저 해답 9수짜리 싱거운 판이었다. 반면 색10 깊이5로 줄이면
   /// 5판 전부, 싱거운 판 없이(조각 27/23) 나온다.
   /// 여기서만 판을 줄였다가 트릭 구간에서 다시 키운다.
+  ///
+  /// ## 격자는 병 수를 나누어떨어지게 잡는다
+  ///
+  /// 병 16개를 한 줄 5개로 놓으면 마지막 줄에 한 개만 덩그러니 남는다.
+  /// 규칙은 이 격자로 거리를 재므로, 그 외톨이 병은 화면에서 보이는 위치와
+  /// 규칙이 세는 위치가 어긋나 **바로 옆인데 못 붓는** 일이 생긴다.
+  /// (실제로 레벨 701이 5·5·5·1로 놓여 그렇게 보였다.)
+  /// 그래서 격자는 반드시 병 수의 약수로 잡는다. 시험이 이걸 지킨다.
   static const List<List<int>> _ruleTiers = [
     // 이웃 제한. 격자를 좁혀 가며 조인다. 판 크기는 그대로.
-    [850, 14, 7, 2, 5, _rReach33], //  701~ 850  가로±3 세로±3
+    [850, 13, 6, 2, 5, _rReach22], //  701~ 850  막히는 짝 26%
     // 규칙이 조여들면 판을 한 단계 낮춘다. 낮추지 않으면 판이 잘 안 만들어지고,
     // 만들어져도 오래 걸린다. (색14 깊이7로 두었더니 10판 중 8판만 나오고
     //  한 판에 최대 3.8초가 걸렸다. 레벨을 넘길 때마다 그만큼 멈춘다는 뜻이다.
     //  색13 깊이6에서는 10판 전부, 평균 0.19초에 나온다.)
-    [1000, 13, 6, 2, 5, _rReach22], //  851~1000  가로±2 세로±2
+    [1000, 10, 5, 2, 4, _rReach21], //  851~1000  막히는 짝 35%
     // 세로만 한 줄로 조인다. 가로가 넉넉해 병이 고립되지 않는다.
-    [1150, 13, 6, 2, 5, _rReach31], // 1001~1150  가로±3 세로±1
+    [1150, 10, 5, 2, 3, _rReach21], // 1001~1150  막히는 짝 41%
     // 가장 좁은 이웃. 여기서만 판을 줄인다.
-    [1300, 10, 5, 2, 4, _rReach11], // 1151~1300  가로±1 세로±1
+    //
+    // ±1/±1은 쓰지 않는다. 어떤 격자로도 열 판 중 두 판이 안 만들어지거나
+    // (격자 4), 만들어져도 절반이 싱거웠다(격자 3·6). 가로를 한 칸 넓힌
+    // ±2/±1은 열 판 전부, 싱거운 판 없이, 20ms에 나온다.
+    // 규칙을 조이는 것이 목적이지 판을 못 만드는 것이 목적이 아니다.
+    [1300, 10, 4, 2, 4, _rReach11], // 1151~1300  막히는 짝 56%
 
     // 트릭 A. 판을 다시 키워 간다.
     [1400, 8, 5, 2, 8, _rA], // 1301~1400
@@ -152,31 +165,31 @@ class LevelConfig {
     [2200, 11, 6, 2, 8, _rAC],
 
     // 마지막 구간: 이웃 제한과 트릭이 함께 걸린다.
-    [2400, 10, 5, 2, 5, _rReach33A], // 2201~2400
-    [2600, 10, 5, 2, 5, _rReach33AB],
-    [1 << 30, 10, 5, 2, 5, _rReach33AC], // 2601~2800 (그 뒤로도 같은 구성)
+    [2400, 10, 5, 2, 4, _rReach21A], // 2201~2400
+    [2600, 10, 5, 2, 4, _rReach21AB],
+    [1 << 30, 10, 5, 2, 4, _rReach21AC], // 2601~2800 (그 뒤로도 같은 구성)
   ];
 
   // 규칙코드. 표를 const로 두려면 RuleSet을 직접 넣을 수 없어 번호로 적는다.
-  static const int _rReach33 = 1;
+  static const int _rReach32 = 1;
   static const int _rReach22 = 2;
-  static const int _rReach31 = 3;
+  static const int _rReach21 = 3;
   static const int _rReach11 = 4;
   static const int _rA = 5;
   static const int _rAB = 6;
   static const int _rAC = 7;
-  static const int _rReach33A = 8;
-  static const int _rReach33AB = 9;
-  static const int _rReach33AC = 10;
+  static const int _rReach21A = 8;
+  static const int _rReach21AB = 9;
+  static const int _rReach21AC = 10;
 
   static RuleSet _rulesFor(int code, int perRow) {
     switch (code) {
-      case _rReach33:
-        return RuleSet.reach(3, 3, perRow: perRow);
+      case _rReach32:
+        return RuleSet.reach(3, 2, perRow: perRow);
       case _rReach22:
         return RuleSet.reach(2, 2, perRow: perRow);
-      case _rReach31:
-        return RuleSet.reach(3, 1, perRow: perRow);
+      case _rReach21:
+        return RuleSet.reach(2, 1, perRow: perRow);
       case _rReach11:
         return RuleSet.reach(1, 1, perRow: perRow);
       case _rA:
@@ -185,20 +198,20 @@ class LevelConfig {
         return const RuleSet(claimEmpties: true, claimMono: true);
       case _rAC:
         return const RuleSet(claimEmpties: true, lockEmptyOrigin: true);
-      case _rReach33A:
+      case _rReach21A:
         return RuleSet(
-            reachX: 3, reachY: 3, gridPerRow: perRow, claimEmpties: true);
-      case _rReach33AB:
+            reachX: 2, reachY: 1, gridPerRow: perRow, claimEmpties: true);
+      case _rReach21AB:
         return RuleSet(
-            reachX: 3,
-            reachY: 3,
+            reachX: 2,
+            reachY: 1,
             gridPerRow: perRow,
             claimEmpties: true,
             claimMono: true);
-      case _rReach33AC:
+      case _rReach21AC:
         return RuleSet(
-            reachX: 3,
-            reachY: 3,
+            reachX: 2,
+            reachY: 1,
             gridPerRow: perRow,
             claimEmpties: true,
             lockEmptyOrigin: true);

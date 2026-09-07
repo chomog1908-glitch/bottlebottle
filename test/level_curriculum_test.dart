@@ -123,4 +123,64 @@ void main() {
     });
   });
 
+  test('격자는 병 수를 나누어떨어지게 잡는다', () {
+    // 병 16개를 한 줄 5개로 놓으면 마지막 줄에 한 개만 덩그러니 남는다.
+    // 규칙은 그 격자로 거리를 재므로, 외톨이 병은 화면에서 보이는 자리와
+    // 규칙이 세는 자리가 어긋나 "바로 옆인데 못 붓는" 일이 생긴다.
+    // (실제로 레벨 701이 5·5·5·1로 놓여 그렇게 보였다.)
+    for (var lv = 701; lv <= 2800; lv += 7) {
+      final c = LevelConfig.forLevel(lv);
+      if (!c.rules.hasReachLimit) continue;
+      expect(c.bottleCount % c.rules.gridPerRow, 0,
+          reason: '레벨 $lv: 병 ${c.bottleCount}개를 한 줄 '
+              '${c.rules.gridPerRow}개로 놓으면 줄이 어긋난다');
+    }
+  });
+
+  test('이웃 제한은 실제로 무언가를 막아야 한다', () {
+    // 규칙을 적어 놓는 것과 규칙이 실제로 막는 것은 다르다.
+    // 병 16개를 4×4로 놓고 ±3을 걸면 어느 병에서든 모든 병에 닿는다.
+    // 막히는 짝이 0개 — 규칙이 이름만 있고 아무 일도 하지 않는다.
+    // (레벨 701~850과 2201~이 실제로 그랬다.)
+    for (var lv = 701; lv <= 2800; lv += 11) {
+      final c = LevelConfig.forLevel(lv);
+      if (!c.rules.hasReachLimit) continue;
+      final n = c.bottleCount;
+      var blocked = 0;
+      for (var a = 0; a < n; a++) {
+        for (var b = 0; b < n; b++) {
+          if (a != b && !c.rules.reaches(a, b)) blocked++;
+        }
+      }
+      expect(blocked, greaterThan(0),
+          reason: '레벨 $lv: ${c.rules}이라고 적혀 있지만 막히는 짝이 하나도 없다');
+    }
+  });
+
+  test('이웃 제한은 구간이 갈수록 조여든다', () {
+    // 막히는 짝의 비율로 잰다. 뒤 구간이 앞 구간보다 헐거우면 곡선이 뒤집힌다.
+    double blockedRatio(int lv) {
+      final c = LevelConfig.forLevel(lv);
+      final n = c.bottleCount;
+      var blocked = 0, total = 0;
+      for (var a = 0; a < n; a++) {
+        for (var b = 0; b < n; b++) {
+          if (a == b) continue;
+          total++;
+          if (!c.rules.reaches(a, b)) blocked++;
+        }
+      }
+      return blocked / total;
+    }
+
+    final bands = [701, 851, 1001, 1151];
+    for (var i = 1; i < bands.length; i++) {
+      expect(blockedRatio(bands[i]),
+          greaterThanOrEqualTo(blockedRatio(bands[i - 1]) - 0.02),
+          reason: '레벨 ${bands[i]}이 ${bands[i - 1]}보다 헐겁다');
+    }
+    // 마지막 이웃 구간은 첫 구간보다 확실히 빡빡해야 한다.
+    expect(blockedRatio(1151), greaterThan(blockedRatio(701) + 0.15));
+  });
+
 }

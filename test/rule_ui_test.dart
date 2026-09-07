@@ -184,4 +184,44 @@ void main() {
     });
   });
 
+  group('어둡게 하는 것은 새 규칙 때문일 때뿐이다', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    testWidgets('색이 안 맞아 못 붓는 병까지 어두워지지는 않는다', (tester) async {
+      // 색 안 맞음·가득 참은 이 게임이 처음부터 가진 규칙이고, 700판을 푸신
+      // 분은 이미 몸으로 아신다. 그것까지 어둡게 하면 못 두는 수를 전부
+      // 지워버리는 셈이라, 정작 새 규칙이 무엇인지 보이지 않는다.
+      //
+      // 실제로 그랬다. 병 하나를 집었을 때 멀어서 어두운 병 3개에 다른 이유로
+      // 어두운 병 12개가 섞여, 판 전체가 꺼진 것처럼 보였다.
+      await tester.pumpWidget(MaterialApp(
+        home: GameScreen(
+          settings: SettingsController(),
+          audio: AudioService(),
+          startLevel: 800,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('알겠습니다'));
+      await tester.pumpAndSettle();
+
+      final all =
+          tester.widgetList<BottleWidget>(find.byType(BottleWidget)).toList();
+      final filled = all.indexWhere((b) => b.contents.isNotEmpty);
+      await tester.tap(find.byType(BottleWidget).at(filled));
+      await tester.pumpAndSettle();
+
+      final after =
+          tester.widgetList<BottleWidget>(find.byType(BottleWidget)).toList();
+      final dim = after.where((b) => b.unreachable).length;
+
+      // 닿지 않는 병은 있어야 하지만, 판 전체가 꺼져서는 안 된다.
+      expect(dim, greaterThan(0), reason: '이웃 제한 판인데 어두운 병이 없다');
+      expect(dim, lessThan(after.length - 1),
+          reason: '집은 병 말고 전부 어두워졌다 — 새 규칙이 보이지 않는다');
+    });
+  });
+
 }

@@ -44,6 +44,12 @@ class LevelGenerator {
   /// 한 레벨을 만들기 위한 최대 시도 횟수.
   static const int maxAttempts = 150;
 
+  /// 판을 만들 때 후보 하나에 쓸 탐색 예산.
+  ///
+  /// 힌트용 기본 예산(40만)보다 훨씬 작다. 생성기는 후보를 고르는 중이라
+  /// 하나에 오래 매달릴 이유가 없고, 어려운 후보는 버리고 다음을 뽑으면 된다.
+  static const int _generationBudget = 30000;
+
   /// [level]번 레벨을 생성한다. 색 수와 병 깊이는 레벨 번호가 정한다.
   static GeneratedLevel generate(int level) =>
       generateWith(LevelConfig.forLevel(level));
@@ -58,9 +64,23 @@ class LevelGenerator {
 
       if (!_isInterestingStart(state)) continue;
       if (!_hasPromisedEmptyBottles(state, config)) continue;
+
       if (state.segmentCount() < _minimumSegments(config)) continue;
 
-      final result = Solver.solve(state);
+      // 판을 만들 때는 **탐색 예산을 짧게 잡는다.**
+      //
+      // 기본 예산(40만 상태)은 힌트를 위한 값이다. 힌트는 어머니가 눌러 기다리는
+      // 것이므로 오래 걸려도 답을 찾는 편이 낫다. 하지만 생성기는 후보를 거르는
+      // 중이고, 후보는 얼마든지 더 뽑을 수 있다. 여기서 오래 붙들 이유가 없다.
+      //
+      // 이웃 제한이 붙으면 병 순서를 정규화하지 못해 탐색이 커진다. 예산을
+      // 그대로 두었더니 어쩌다 어려운 후보 하나가 40만 상태를 다 쓰고 나서야
+      // "못 풀겠다"고 답했다. 그 한 번에 13초가 들어, 레벨 874를 여는 데
+      // 14초가 걸렸다. 예산을 줄이면 그런 후보는 빨리 포기하고 다음을 뽑는다.
+      //
+      // 버리는 것은 "어려워서 오래 걸리는 후보"뿐이고, 그런 후보는 어차피
+      // 힌트도 느릴 판이라 내보내지 않는 편이 낫다.
+      final result = Solver.solve(state, nodeBudget: _generationBudget);
       if (!result.solved) continue;
 
       return GeneratedLevel(
@@ -84,7 +104,7 @@ class LevelGenerator {
       if (state.isSolved) continue;
       // 조건을 완화해도 이것만은 지킨다. 약속한 빈 병 개수는 난이도의 근간이다.
       if (!_hasPromisedEmptyBottles(state, config)) continue;
-      final result = Solver.solve(state);
+      final result = Solver.solve(state, nodeBudget: _generationBudget);
       if (result.solved) {
         return GeneratedLevel(
           config: config,
