@@ -1,3 +1,5 @@
+import '../model/rule_set.dart';
+
 /// 레벨 번호 → 난이도 파라미터.
 ///
 /// 난이도를 키우는 축이 셋이다.
@@ -21,11 +23,15 @@ class LevelConfig {
   /// 병 하나의 깊이(칸 수).
   final int capacity;
 
+  /// 이 레벨에 적용되는 규칙. 레벨 700까지는 [RuleSet.classic]이다.
+  final RuleSet rules;
+
   const LevelConfig({
     required this.level,
     required this.colorCount,
     required this.emptyBottles,
     required this.capacity,
+    this.rules = RuleSet.classic,
   });
 
   /// 화면에 놓이는 전체 병 수.

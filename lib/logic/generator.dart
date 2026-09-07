@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../model/game_state.dart';
+import '../model/rule_set.dart';
 import 'level_config.dart';
 import 'solver.dart';
 
@@ -44,11 +45,15 @@ class LevelGenerator {
   static const int maxAttempts = 150;
 
   /// [level]번 레벨을 생성한다. 색 수와 병 깊이는 레벨 번호가 정한다.
-  static GeneratedLevel generate(int level) {
-    final config = LevelConfig.forLevel(level);
+  static GeneratedLevel generate(int level) =>
+      generateWith(LevelConfig.forLevel(level));
 
+  /// 난이도표를 거치지 않고 [config]를 직접 주어 생성한다.
+  ///
+  /// 난이도표에 아직 없는 규칙 조합을 시험할 때 쓴다. [generate]는 이걸 부른다.
+  static GeneratedLevel generateWith(LevelConfig config) {
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      final rng = Random(_seedFor(level, attempt));
+      final rng = Random(_seedFor(config.level, attempt));
       final state = _shuffleFromSolved(config, rng);
 
       if (!_isInterestingStart(state)) continue;
@@ -120,6 +125,7 @@ class LevelGenerator {
 
   static GameState _shuffleFromSolved(LevelConfig config, Random rng) {
     final cap = config.capacity;
+    final rules = config.rules;
 
     // 언제부터 빈 병을 지킬지. 시도마다 다르게 잡는다.
     //
@@ -131,6 +137,19 @@ class LevelGenerator {
     final b = <List<int>>[
       for (var c = 0; c < config.colorCount; c++) [for (var k = 0; k < cap; k++) c],
       for (var i = 0; i < config.emptyBottles; i++) <int>[],
+    ];
+
+    // 어느 병이 "빈 병 출신"인가.
+    //
+    // 되감기는 완성 상태에서 거꾸로 가므로, 시작 판이 확정되기 전에는 알 수 없다.
+    // 그런데 조건 3은 섞는 도중에 이 값을 필요로 한다. 닭과 달걀이다.
+    //
+    // 풀이: **완성 상태에서 비어 있는 병을 빈 병 출신으로 삼는다.** 되감기가 끝나
+    // 시작 판이 되어도 이 병들은 그대로 빈 병으로 남는다 — `considerCurrent`가
+    // 빈 병 개수가 약속과 정확히 같은 순간만 채택하고, 색 병은 되감기로 비워질 수
+    // 없기 때문이다. (조건 2가 "다 떼어낼 거면 병이 완전히 비어야 한다"고 막는다.)
+    final startedEmpty = [
+      for (var i = 0; i < b.length; i++) b[i].isEmpty,
     ];
 
     int topRun(List<int> x) {
@@ -193,6 +212,8 @@ class LevelGenerator {
             if (b[s].length + k > cap) continue;
             // 조건 1: 같은 색 위에 얹으면 안 된다.
             if (b[s].isNotEmpty && b[s].last == c) continue;
+            // 조건 3: 되돌리는 수(s → d)가 이 판의 규칙 아래에서 실제로 성립해야 한다.
+            if (!_rewindHolds(b, cap, rules, startedEmpty, d, k, s)) continue;
             candidates.add([d, k, s]);
           }
         }
@@ -220,16 +241,40 @@ class LevelGenerator {
       // 그래서 **먼저 섞고, 나중에 지킨다.** 앞부분에서는 마음껏 흐트러뜨리고,
       // 뒷부분에 들어서야 빈 병을 되찾도록 유도한다. 스냅숏은 뒤로 갈수록
       // 좋은 것으로 덮어쓰므로, 마지막에 조건을 맞추면 그게 채택된다.
-      final guardEmpties = step >= guardFrom && emptyNow <= config.emptyBottles;
+      // 이웃 제한이 붙으면 **되찾기가 어려우므로 애초에 잃지 않는다.**
+      //
+      // 기본 규칙에서는 빈 병을 다 써버려도 흐르다 보면 되찾아진다. 어느 병이든
+      // 어느 병으로든 부을 수 있으니 병을 비우는 길이 늘 있다. 이웃 제한에서는
+      // 그 길이 막힌다. 빈 병이 0이 된 판은 그대로 굳어버린다.
+      // (실측: ±3에서 60판 중 빈 병 2개가 남은 판이 0판. 되찾는 수를 우선해도
+      //  그대로 0판이었다 — 되찾을 수가 아예 후보에 없기 때문이다.)
+      //
+      // 그래서 제한이 있으면 **약속한 수보다 하나 많은 선에서 미리 지킨다.**
+      // 여유분 하나가 흐를 통로가 되고, 마지막에 그 하나가 채워지며 약속에 맞는다.
+      final floor = config.rules.hasReachLimit
+          ? config.emptyBottles + 1
+          : config.emptyBottles;
+      final guardEmpties = step >= guardFrom && emptyNow <= floor;
 
       // 빈 병을 쓰지 않는 수 = 받는 병 s가 이미 차 있는 수. 이게 판을 헝클어뜨린다.
       final stacking = candidates.where((t) => b[t[2]].isNotEmpty).toList();
 
-      // 빈 병이 모자랄 때는 **빈 병을 더 쓰지 않는 수**만 둔다.
-      // 빈 병을 새로 만드는 수까지 강제하면 판이 빈 병 수에 붙들려
-      // 헝클어지지 못한 채 굳는다. 막지만 말고, 흐르게 둔다.
-      final pool = guardEmpties && stacking.isNotEmpty
-          ? stacking
+      // 빈 병을 **되찾는** 수 = 병 d를 통째로 비우는 수.
+      //
+      // 기본 규칙에서는 이게 필요 없었다. 빈 병을 안 쓰는 수(stacking)만 골라도
+      // 흐르다 보면 병이 저절로 비었기 때문이다. 이웃 제한이 붙으면 그게 안 된다.
+      // 닿는 병이 적어 stacking 후보 자체가 말라붙고, 남는 건 빈 병을 채우는
+      // 수뿐이라 빈 병이 0개로 굳는다. (실측: ±3에서 60판 중 빈 병 2개가 0판)
+      //
+      // 그래서 모자랄 때는 **되찾는 수를 먼저** 본다. 막는 것만으로는 부족하고,
+      // 되돌려 놓을 길을 열어줘야 한다.
+      final freeing =
+          candidates.where((t) => b[t[0]].length == t[1]).toList();
+
+      final pool = guardEmpties
+          ? (freeing.isNotEmpty && rng.nextInt(3) > 0
+              ? freeing
+              : (stacking.isNotEmpty ? stacking : candidates))
           : (stacking.isNotEmpty && rng.nextInt(5) > 0 ? stacking : candidates);
 
       final pick = pool[rng.nextInt(pool.length)];
@@ -245,7 +290,52 @@ class LevelGenerator {
 
     // 조건을 만족한 순간이 한 번도 없었다면 마지막 상태를 넘긴다.
     // 바깥에서 어차피 한 번 더 거르므로, 여기서 실패를 알릴 필요는 없다.
-    return GameState(accepted ?? b, capacity: cap);
+    return GameState(accepted ?? b, capacity: cap, rules: rules);
+  }
+
+  /// 되감기 한 번이 **앞으로 두는 규칙 아래에서 그대로 성립하는가.**
+  ///
+  /// 되감기는 "누군가 [s]에서 [d]로 [k]칸 부었다"고 가정하고 그걸 되돌린다.
+  /// 그 가정이 규칙상 불가능하면, 되감아 만든 판은 되돌아갈 길이 없는 판이 된다.
+  /// 즉 **풀 수 없는 판**이다. 조건 1·2만으로는 기본 규칙에서만 이게 보장된다.
+  ///
+  /// 그래서 되감기 뒤의 판을 실제로 만들어 보고, 그 판에서 [s] → [d]가
+  /// [GameState.canPour]를 통과할 때만 이 되감기를 채택한다.
+  /// 규칙을 여기에 다시 적지 않고 **[GameState]에게 물어본다.** 규칙이 늘어나도
+  /// 생성기는 고칠 것이 없고, 두 곳의 해석이 어긋날 일도 없다.
+  static bool _rewindHolds(
+    List<List<int>> b,
+    int cap,
+    RuleSet rules,
+    List<bool> startedEmpty,
+    int d,
+    int k,
+    int s,
+  ) {
+    if (!rules.hasReachLimit && !rules.hasLocks) return true;
+
+    // 되감기를 적용한 판을 만든다.
+    final after = [for (final x in b) List<int>.of(x)];
+    final c = after[d].last;
+    for (var i = 0; i < k; i++) {
+      after[d].removeLast();
+      after[s].add(c);
+    }
+
+    // 그 판에서 s → d가 규칙상 가능해야 한다.
+    // startedEmpty는 **시작 판**이 정하므로 여기서 명시적으로 넘겨준다.
+    // (GameState의 기본 생성자는 지금 비어 있는 병을 빈 병 출신으로 본다.
+    //  섞는 도중의 판에 그걸 맡기면 매 수마다 빈 병 출신이 달라진다.)
+    final probe = GameState.withOrigins(
+      after,
+      capacity: cap,
+      rules: rules,
+      startedEmpty: startedEmpty,
+    );
+    if (!probe.canPour(s, d)) return false;
+
+    // 옮겨지는 양까지 정확히 k칸이어야 원래 판으로 되돌아온다.
+    return probe.pourAmount(s, d) == k;
   }
 
   /// 시작부터 김이 빠지는 판을 걸러낸다.

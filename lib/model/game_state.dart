@@ -53,6 +53,28 @@ class GameState {
     return state;
   }
 
+  /// 빈 병 출신을 **직접 지정해서** 상태를 만든다.
+  ///
+  /// 기본 생성자는 "지금 비어 있는 병"을 빈 병 출신으로 본다. 시작 판에서는 그게 맞다.
+  /// 하지만 레벨 생성기는 판을 섞는 **도중의** 보드로 규칙을 시험해 봐야 하는데,
+  /// 그 순간 비어 있는 병은 시작 판의 빈 병과 다르다. 그때 이 생성자를 쓴다.
+  factory GameState.withOrigins(
+    List<List<int>> bottles, {
+    required int capacity,
+    required RuleSet rules,
+    required List<bool> startedEmpty,
+  }) {
+    final state = GameState._(
+      [for (final b in bottles) List<int>.of(b)],
+      capacity,
+      rules,
+      List<bool>.of(startedEmpty),
+      List<int?>.filled(bottles.length, null),
+    );
+    state._relock();
+    return state;
+  }
+
   /// 이 병이 전용으로 굳은 색. 잠기지 않았으면 null. 화면이 테두리 색에 쓴다.
   int? claimedColor(int i) => _claimed[i];
 
