@@ -6,13 +6,29 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('난이도 곡선', () {
-    test('깊이는 절대 얕아지지 않는다', () {
+    test('깊이는 절대 얕아지지 않는다 — 규칙이 붙기 전까지', () {
+      // 700까지는 깊이가 유일한 난이도 축이므로 되돌아가면 안 된다.
+      //
+      // 701부터는 다르다. 새 규칙이 들어올 때 판을 잠시 줄였다가 다시 키운다.
+      // 규칙과 크기를 한꺼번에 올리면 절벽이 되기 때문이다. 그래서 이 구간의
+      // 깊이는 오르내린다. 그건 고장이 아니라 설계다.
       var prev = 0;
-      for (var lv = 1; lv <= 1000; lv++) {
+      for (var lv = 1; lv <= 700; lv++) {
         final c = LevelConfig.forLevel(lv);
         expect(c.capacity, greaterThanOrEqualTo(prev), reason: '레벨 $lv에서 병이 얕아졌습니다.');
         prev = c.capacity;
       }
+    });
+
+    test('새 규칙이 들어올 때는 판이 작아졌다가 다시 커진다', () {
+      // 트릭 A가 시작되는 1301에서 판이 작아지고, 구간 안에서 다시 커져야 한다.
+      final before = LevelConfig.forLevel(1300);
+      final at = LevelConfig.forLevel(1301);
+      final later = LevelConfig.forLevel(1600);
+      expect(at.totalUnits, lessThan(before.totalUnits),
+          reason: '새 규칙이 들어오는데 판이 줄지 않았다');
+      expect(later.totalUnits, greaterThan(at.totalUnits),
+          reason: '줄어든 판이 다시 커지지 않았다');
     });
 
     test('총 칸 수는 전반적으로 늘어난다', () {
