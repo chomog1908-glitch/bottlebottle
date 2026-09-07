@@ -1,4 +1,5 @@
 import 'move.dart';
+import 'rule_set.dart';
 
 /// 물병 정렬 퍼즐의 보드 상태.
 ///
@@ -15,16 +16,75 @@ class GameState {
   final List<List<int>> _bottles;
   final List<Move> _history = [];
 
-  GameState._(this._bottles, this.capacity);
+  /// 이 판의 규칙. 레벨 700까지는 [RuleSet.classic]이다.
+  final RuleSet rules;
+
+  /// 처음에 비어 있던 병인가. 트릭 A·C가 이걸 본다.
+  ///
+  /// **판이 시작될 때 정해지고 그 뒤로 바뀌지 않는다.** 나중에 비워진 병과
+  /// 처음부터 비어 있던 병은 다른 것으로 취급해야 규칙이 흔들리지 않는다.
+  final List<bool> _startedEmpty;
+
+  /// 이 병이 전용으로 굳은 색. 잠기지 않았으면 null.
+  final List<int?> _claimed;
+
+  GameState._(this._bottles, this.capacity, this.rules, this._startedEmpty,
+      this._claimed);
 
   /// 병의 내용물 목록으로 상태를 만든다. 입력은 복사되므로 이후 변경에 영향받지 않는다.
-  factory GameState(List<List<int>> bottles, {int capacity = defaultCapacity}) {
+  factory GameState(
+    List<List<int>> bottles, {
+    int capacity = defaultCapacity,
+    RuleSet rules = RuleSet.classic,
+  }) {
     for (final b in bottles) {
       if (b.length > capacity) {
         throw ArgumentError('병에 용량($capacity)보다 많은 ${b.length}칸이 들어있습니다.');
       }
     }
-    return GameState._([for (final b in bottles) List<int>.of(b)], capacity);
+    final state = GameState._(
+      [for (final b in bottles) List<int>.of(b)],
+      capacity,
+      rules,
+      [for (final b in bottles) b.isEmpty],
+      List<int?>.filled(bottles.length, null),
+    );
+    state._relock();
+    return state;
+  }
+
+  /// 이 병이 전용으로 굳은 색. 잠기지 않았으면 null. 화면이 테두리 색에 쓴다.
+  int? claimedColor(int i) => _claimed[i];
+
+  /// 이 병이 처음부터 비어 있었는가.
+  bool startedEmpty(int i) => _startedEmpty[i];
+
+  /// 한 색으로만 이루어져 있는가. (비어 있으면 false)
+  bool isMonochrome(int i) {
+    final b = _bottles[i];
+    if (b.isEmpty) return false;
+    for (final v in b) {
+      if (v != b.first) return false;
+    }
+    return true;
+  }
+
+  /// 수를 둔 뒤 잠금을 다시 계산한다.
+  ///
+  /// 규칙이 없으면 아무 일도 하지 않으므로, 레벨 700까지는 비용이 0이다.
+  void _relock() {
+    if (!rules.hasLocks) return;
+    for (var i = 0; i < _bottles.length; i++) {
+      if (_bottles[i].isEmpty) {
+        // 비면 잠금이 풀린다. 단 트릭 A의 빈 병 출신은 영구다.
+        if (!(rules.claimEmpties && _startedEmpty[i])) _claimed[i] = null;
+      } else if (isMonochrome(i)) {
+        if (rules.claimEmpties && _startedEmpty[i]) {
+          _claimed[i] ??= _bottles[i].first;
+        }
+        if (rules.claimMono) _claimed[i] = _bottles[i].first;
+      }
+    }
   }
 
   int get bottleCount => _bottles.length;
@@ -84,7 +144,25 @@ class GameState {
     final dst = _bottles[to];
     if (src.isEmpty) return false;
     if (dst.length >= capacity) return false;
-    return dst.isEmpty || dst.last == src.last;
+    if (dst.isNotEmpty && dst.last != src.last) return false;
+
+    // 여기부터는 특별 규칙. 없으면 곧바로 통과한다.
+    if (!rules.hasReachLimit && !rules.hasLocks) return true;
+
+    if (!rules.reaches(from, to)) return false;
+
+    // 트릭 C — 빈 병에서 출발한 병은 가득 차기 전까지 못 따라낸다.
+    if (rules.lockEmptyOrigin &&
+        _startedEmpty[from] &&
+        src.length < capacity) {
+      return false;
+    }
+
+    // 잠긴 병은 그 색만 받는다.
+    final lock = _claimed[to];
+    if (lock != null && lock != src.last) return false;
+
+    return true;
   }
 
   /// [from]에서 [to]로 실제로 옮겨질 칸 수. 부을 수 없으면 0.
@@ -108,6 +186,7 @@ class GameState {
     }
     final move = Move(from: from, to: to, count: n, color: color);
     _history.add(move);
+    _relock();
     return move;
   }
 
@@ -121,6 +200,7 @@ class GameState {
       _bottles[m.to].removeLast();
       _bottles[m.from].add(m.color);
     }
+    _relock();
     return m;
   }
 
@@ -201,15 +281,28 @@ class GameState {
   GameState copy() => GameState._(
         [for (final b in _bottles) List<int>.of(b)],
         capacity,
+        rules,
+        _startedEmpty,
+        List<int?>.of(_claimed),
       );
 
-  /// 중복 상태 판별용 정규화 키.
+  /// 중복 상태 판별용 키.
   ///
   /// 병의 **순서는 게임 규칙상 의미가 없으므로** 정렬해서 같은 상태로 취급한다.
   /// 이 정규화 덕분에 탐색 공간이 크게 줄어든다.
+  ///
+  /// **단, 이웃 제한이 붙으면 위치가 의미를 갖는다.** 그때 정렬하면 서로 다른
+  /// 상태를 같다고 잘못 판단해 탐색기가 없는 해답을 있다고 하거나 그 반대가 된다.
+  /// 그래서 제한이 있으면 순서를 그대로 둔다. 잠금도 마찬가지로 키에 넣는다.
+  /// (실측: 이웃 제한이 걸리면 가지 수가 줄어 정규화를 잃은 손해를 메우고도 남는다.)
   String canonicalKey() {
-    final parts = [for (final b in _bottles) b.join(',')]..sort();
-    return parts.join('|');
+    final parts = [for (final b in _bottles) b.join(',')];
+    if (!rules.hasReachLimit && !rules.hasLocks) {
+      parts.sort();
+      return parts.join('|');
+    }
+    final locks = [for (final c in _claimed) c ?? -1].join(',');
+    return '${parts.join('|')}#$locks';
   }
 
   @override
