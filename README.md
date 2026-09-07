@@ -15,7 +15,7 @@
 ![Offline](https://img.shields.io/badge/100%25-오프라인-6C4AB6?style=for-the-badge)
 ![No Ads](https://img.shields.io/badge/광고-0개-E53935?style=for-the-badge)
 
-![Tests](https://img.shields.io/badge/테스트-220%2F220-43A047?style=flat-square)
+![Tests](https://img.shields.io/badge/테스트-236%2F236-43A047?style=flat-square)
 ![Lints](https://img.shields.io/badge/flutter%20analyze-경고%200-00ACC1?style=flat-square)
 ![Deps](https://img.shields.io/badge/의존성-2개-FB8C00?style=flat-square)
 ![Levels](https://img.shields.io/badge/레벨-2800%2B-8E24AA?style=flat-square)
@@ -410,7 +410,7 @@ lib/
 
 ```bash
 flutter pub get           # 의존성 (딱 하나)
-flutter test              # 테스트 220개
+flutter test              # 테스트 236개
 flutter analyze           # 경고 0건
 flutter run               # 연결된 기기에서 실행
 flutter build apk --release
