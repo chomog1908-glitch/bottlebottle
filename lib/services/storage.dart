@@ -12,18 +12,38 @@ class SavedGame {
   /// 지금까지 둔 수. `[from, to]` 쌍의 목록이다.
   final List<List<int>> moves;
 
-  const SavedGame({required this.level, required this.moves});
+  /// 이 판의 **시작 보드**. 예전 저장에는 없으므로 null일 수 있다.
+  ///
+  /// 지금 보드가 아니라 시작 보드를 담는 이유: 수순을 그 위에 다시 두어야
+  /// 되돌리기 기록이 함께 살아난다. 지금 보드만 저장하면 보드와 되돌리기가
+  /// 따로 놀아, 복원한 뒤 되돌리기를 누르면 엉뚱한 데로 간다.
+  final List<List<int>>? board;
+
+  const SavedGame({required this.level, required this.moves, this.board});
 }
 
 /// 진행도와 설정을 기기에 저장한다.
 ///
-/// **저장 형식이 아주 작다.** 레벨 번호와 둔 수 목록만 남긴다.
-/// 레벨은 번호만 알면 똑같이 다시 만들어지므로(생성기가 결정적이다),
-/// 그 위에 둔 수를 순서대로 다시 두면 보드가 정확히 복원된다.
-/// 되돌리기 기록과 빈 병 사용 기록까지 통째로 살아나는 것은 덤이다.
+/// **시작 보드와 둔 수 목록을 함께 남긴다.**
+/// 시작 보드 위에 수를 순서대로 다시 두면 지금 보드가 정확히 복원되고,
+/// 되돌리기 기록과 빈 병 사용 기록까지 통째로 살아난다.
 ///
-/// 병의 내용물을 통째로 저장하지 않는 이유이기도 하다. 그렇게 하면
-/// 저장된 보드와 되돌리기 기록이 따로 놀아, 복원 후 되돌리기가 깨진다.
+/// ## 왜 시작 보드를 저장하게 되었나
+///
+/// 처음에는 레벨 번호와 수순만 저장했다. 레벨은 번호만 알면 똑같이 다시
+/// 만들어지므로(생성기가 결정적이다) 그것으로 충분해 보였다.
+///
+/// **그런데 생성기를 고치면 판이 달라진다.** 레벨 432가 열리지 않던 것을
+/// 고치면서 셔플이 난수를 한 번 더 뽑게 되었고, 그 한 번이 난수 흐름을 밀어
+/// **레벨 1~700 중 699개의 판이 바뀌었다.** 어머니가 두시던 레벨 431의 43수는
+/// 첫 수부터 재생되지 않았다. 진행도와 도전과제는 레벨 번호로 남으니 무사했지만,
+/// 붙잡고 계시던 판 하나가 통째로 날아갔다.
+///
+/// 앞으로 생성기를 안 고치겠다는 약속으로는 이걸 막을 수 없다. 그래서
+/// **판을 다시 만들지 않아도 되게** 보드를 함께 저장한다. 몇 KB 더 든다.
+///
+/// 지금 보드가 아니라 **시작 보드**를 담는다. 지금 보드만 저장하면 보드와
+/// 되돌리기 기록이 따로 놀아, 복원한 뒤 되돌리기가 깨지기 때문이다.
 class Storage {
   static const String _keySave = 'saved_game_v1';
   static const String _keyMaxLevel = 'max_level_v1';
@@ -39,10 +59,17 @@ class Storage {
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   /// 지금 판을 저장한다. 수를 둘 때마다 호출해도 될 만큼 가볍다.
-  Future<void> saveGame(int level, List<Move> moves) async {
+  ///
+  /// [board]는 이 판의 **시작 보드**다. 생성기가 바뀌어도 판이 살아남게 한다.
+  Future<void> saveGame(
+    int level,
+    List<Move> moves, {
+    List<List<int>>? board,
+  }) async {
     final data = jsonEncode({
       'level': level,
       'moves': [for (final m in moves) [m.from, m.to]],
+      'board': ?board,
     });
     (await _prefs).setString(_keySave, data);
   }
@@ -60,7 +87,15 @@ class Storage {
         for (final m in (map['moves'] as List))
           [(m as List)[0] as int, m[1] as int],
       ];
-      return SavedGame(level: level, moves: moves);
+      // 예전 저장에는 보드가 없다. 그때는 레벨 번호로 다시 만든다.
+      final rawBoard = map['board'];
+      final board = rawBoard is List
+          ? [
+              for (final b in rawBoard)
+                [for (final v in (b as List)) v as int],
+            ]
+          : null;
+      return SavedGame(level: level, moves: moves, board: board);
     } catch (_) {
       return null;
     }

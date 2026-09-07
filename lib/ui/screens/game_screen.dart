@@ -96,7 +96,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final c = GameController(startLevel: widget.startLevel ?? 1);
     // 복원은 **기록에 넣지 않는다.** 이미 세어 둔 수를 다시 세게 된다.
     // 그래서 사건을 듣기 시작하는 것은 복원이 끝난 뒤다.
-    if (saved != null) c.restore(saved.level, saved.moves);
+    if (saved != null) {
+      c.restore(saved.level, saved.moves, board: saved.board);
+    }
     c.onEvent = _onGameEvent;
     c.addListener(_onControllerChanged);
 
@@ -149,7 +151,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _persist() {
     final c = _controller;
     if (c == null) return;
-    _storage.saveGame(c.level, c.state.history);
+    // 시작 보드를 함께 남긴다. 생성기가 바뀌어도 두시던 판이 살아남는다.
+    _storage.saveGame(c.level, c.state.history, board: c.startingBoard);
     _storage.saveMaxLevel(c.level);
     // 다 푼 레벨은 폴더 화면에 완성 표시로 남는다.
     if (c.isSolved) _storage.addClearedLevel(c.level);

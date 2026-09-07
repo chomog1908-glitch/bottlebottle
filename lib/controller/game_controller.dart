@@ -130,15 +130,23 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 이 판의 **시작 보드**. 저장해 두었다가 그대로 복원하는 데 쓴다.
+  ///
+  /// 지금 보드가 아니라 시작 보드다. 수순을 그 위에 다시 두어야
+  /// 되돌리기 기록까지 함께 살아난다.
+  List<List<int>> get startingBoard => _generated.state.bottles;
+
   /// 저장해 둔 수순을 재생해 판을 복원한다.
   ///
-  /// 레벨 생성이 결정적이므로 같은 레벨 위에 같은 수를 순서대로 두면
-  /// 보드는 물론 되돌리기 기록과 빈 병 사용 기록까지 그대로 살아난다.
+  /// [board]가 있으면 그것을 시작 보드로 쓴다. 없으면 레벨 번호로 다시 만든다.
+  /// **생성기가 바뀌어도 두시던 판이 살아남는 유일한 길이다.** 실제로 레벨 432를
+  /// 고치면서 700레벨 가운데 699개의 판이 바뀌었고, 저장된 수순이 재생되지 않았다.
   ///
   /// 저장이 손상돼 둘 수 없는 수가 나오면 **거기까지만 복원하고 멈춘다.**
   /// 게임을 못 켜게 하는 것보다 조금 덜 복원되는 편이 낫다.
-  void restore(int level, List<List<int>> moves) {
+  void restore(int level, List<List<int>> moves, {List<List<int>>? board}) {
     loadLevel(level);
+    if (board != null) _adoptBoard(board);
     for (final m in moves) {
       if (m.length < 2) break;
       if (!state.canPour(m[0], m[1])) break;
@@ -146,6 +154,33 @@ class GameController extends ChangeNotifier {
       _recordPeak();
     }
     notifyListeners();
+  }
+
+  /// 저장해 둔 시작 보드를 이 판의 시작 보드로 삼는다.
+  ///
+  /// 생성된 판을 통째로 갈아끼우므로, 이 뒤로 "다시 시작"을 눌러도
+  /// 저장해 둔 그 판으로 돌아간다. 어머니가 보시던 판이 그대로여야 한다.
+  ///
+  /// 보드가 이 레벨의 규격과 어긋나면(칸 수가 넘치는 등) 조용히 무시하고
+  /// 생성된 판을 쓴다. 저장이 손상돼도 게임은 켜져야 한다.
+  void _adoptBoard(List<List<int>> board) {
+    final cap = _generated.config.capacity;
+    if (board.length != _generated.state.bottleCount) return;
+    for (final b in board) {
+      if (b.length > cap) return;
+    }
+    try {
+      _generated = GeneratedLevel(
+        config: _generated.config,
+        state: GameState(board,
+            capacity: cap, rules: _generated.config.rules),
+        solutionLength: _generated.solutionLength,
+        attempts: _generated.attempts,
+      );
+    } catch (_) {
+      return;
+    }
+    _resetBoard();
   }
 
   void _resetBoard() {
