@@ -218,6 +218,60 @@ void main() {
       expect(c.isSolved, isTrue);
     });
   });
+
+  group('힌트는 반드시 판을 끝낸다', () {
+    // 탐색기는 최단 해답을 보장하지 않는다. 그래서 힌트를 누를 때마다 새로 찾으면
+    // 서로 다른 해답의 첫 수를 오가며 영원히 왕복할 수 있다. 실제로 레벨 1에서
+    // 0→3, 3→0을 무한히 반복해 힌트만으로는 판이 끝나지 않았다.
+    // 컨트롤러가 한 번 찾은 수순을 들고 가는지를 여기서 지킨다.
+    for (final level in [1, 2, 3, 40, 120, 432]) {
+      test('레벨 $level은 힌트만 따라가도 끝난다', () {
+        final c = GameController(startLevel: level);
+        // 넉넉히 잡되 무한은 아니다. 왕복에 빠지면 여기서 걸린다.
+        final limit = c.state.bottleCount * c.state.capacity * 12;
+
+        var guard = 0;
+        while (!c.isSolved) {
+          c.requestHint();
+          final h = c.hintMove;
+          expect(h, isNotNull, reason: '레벨 $level에서 힌트가 끊겼습니다.');
+          c.tapBottle(h!.from);
+          c.tapBottle(h.to);
+          expect(++guard, lessThan(limit),
+              reason: '레벨 $level에서 힌트가 같은 자리를 맴돕니다.');
+        }
+      });
+    }
+
+    test('중간에 다른 수를 둬도 힌트가 이어서 판을 끝낸다', () {
+      // 사용자가 수순을 벗어나면 들고 있던 계획은 버리고 새로 찾아야 한다.
+      final c = GameController(startLevel: 3);
+      var guard = 0;
+      var detoured = false;
+
+      while (!c.isSolved) {
+        c.requestHint();
+        final h = c.hintMove!;
+        if (!detoured) {
+          // 딱 한 번, 힌트와 다른 수를 둔다.
+          for (var i = 0; i < c.state.bottleCount && !detoured; i++) {
+            for (var j = 0; j < c.state.bottleCount; j++) {
+              if ((i == h.from && j == h.to) || !c.state.canPour(i, j)) continue;
+              c.tapBottle(i);
+              c.tapBottle(j);
+              detoured = true;
+              break;
+            }
+          }
+          if (detoured) continue;
+        }
+        c.tapBottle(h.from);
+        c.tapBottle(h.to);
+        expect(++guard, lessThan(600), reason: '힌트가 판을 끝내지 못했습니다.');
+      }
+      expect(detoured, isTrue, reason: '다른 길로 새는 수를 두지 못했습니다.');
+    });
+  });
 }
 
 int _firstNonEmpty(GameController c) {

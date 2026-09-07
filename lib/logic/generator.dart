@@ -114,8 +114,20 @@ class LevelGenerator {
   ///
   /// 이 규칙만 지키면 흐트러뜨린 판은 되감은 횟수만큼의 수순으로 반드시 원상복구된다.
   /// 즉 **풀 수 있음이 구조적으로 보장된다.**
+  /// 진단용 통로. 시험 도구에서만 쓴다.
+  static GameState debugShuffle(LevelConfig config, Random rng) =>
+      _shuffleFromSolved(config, rng);
+
   static GameState _shuffleFromSolved(LevelConfig config, Random rng) {
     final cap = config.capacity;
+
+    // 언제부터 빈 병을 지킬지. 시도마다 다르게 잡는다.
+    //
+    // 이 값이 이 생성기의 유일한 저울이다. 일찍 지키면 빈 병은 남지만 판이 덜 섞이고,
+    // 늦게 지키면 잘 섞이지만 빈 병을 못 되찾는다. 어느 한쪽으로 고정하면
+    // 반드시 어느 레벨에선가 걸린다. (일찍 고정 → 레벨 500이 조각 미달,
+    // 늦게 고정 → 레벨 432가 빈 병을 못 맞춤.) 그래서 고르지 않고 **흔든다.**
+    // 시도를 거듭하며 이 지점이 바뀌므로, 어느 레벨이든 맞는 지점을 만나게 된다.
     final b = <List<int>>[
       for (var c = 0; c < config.colorCount; c++) [for (var k = 0; k < cap; k++) c],
       for (var i = 0; i < config.emptyBottles; i++) <int>[],
@@ -165,6 +177,7 @@ class LevelGenerator {
     }
 
     final steps = config.colorCount * cap * 5;
+    final guardFrom = steps * (2 + rng.nextInt(7)) ~/ 10;
     for (var step = 0; step < steps; step++) {
       // (덜어낼 병 d, 칸 수 k, 받을 병 s) 후보를 모은다.
       final candidates = <List<int>>[];
@@ -188,8 +201,36 @@ class LevelGenerator {
 
       // 빈 병을 그대로 남겨두는 쪽보다, 다른 색 위에 얹어 켜켜이 쌓는 쪽을 선호한다.
       // 그래야 실제로 헝클어진 판이 된다.
+      //
+      // 다만 **약속한 빈 병 수는 지켜야 한다.** 되감기는 빈 병을 즐겨 채우는데,
+      // 병이 깊을수록 그 경향이 심해져 빈 병이 하나도 안 남는 상태로 굳어버린다.
+      // (깊이 8칸에서는 200번 섞어 빈 병 2개가 남은 적이 0~7번뿐이었다.
+      //  그래서 레벨 432는 750번을 시도하고도 판을 못 만들어 예외를 던졌다.)
+      //
+      // 그래서 빈 병이 약속한 수보다 적어지면, 그때부터는 **빈 병을 채우지 않는 수**를
+      // 우선한다. 빈 병을 비우는 수(병 전체를 옮겨 d가 비는 수)는 오히려 반긴다.
+      var emptyNow = 0;
+      for (final x in b) {
+        if (x.isEmpty) emptyNow++;
+      }
+      // 빈 병을 지키는 것과 판을 헝클어뜨리는 것은 서로 반대 방향으로 당긴다.
+      // 처음부터 빈 병을 지키면 액체가 퍼지지 못해 판이 덜 섞인 채로 굳는다.
+      // (실제로 그렇게 만들었더니 레벨 500이 조각 41개로 기준 미달이 났다.)
+      //
+      // 그래서 **먼저 섞고, 나중에 지킨다.** 앞부분에서는 마음껏 흐트러뜨리고,
+      // 뒷부분에 들어서야 빈 병을 되찾도록 유도한다. 스냅숏은 뒤로 갈수록
+      // 좋은 것으로 덮어쓰므로, 마지막에 조건을 맞추면 그게 채택된다.
+      final guardEmpties = step >= guardFrom && emptyNow <= config.emptyBottles;
+
+      // 빈 병을 쓰지 않는 수 = 받는 병 s가 이미 차 있는 수. 이게 판을 헝클어뜨린다.
       final stacking = candidates.where((t) => b[t[2]].isNotEmpty).toList();
-      final pool = stacking.isNotEmpty && rng.nextInt(5) > 0 ? stacking : candidates;
+
+      // 빈 병이 모자랄 때는 **빈 병을 더 쓰지 않는 수**만 둔다.
+      // 빈 병을 새로 만드는 수까지 강제하면 판이 빈 병 수에 붙들려
+      // 헝클어지지 못한 채 굳는다. 막지만 말고, 흐르게 둔다.
+      final pool = guardEmpties && stacking.isNotEmpty
+          ? stacking
+          : (stacking.isNotEmpty && rng.nextInt(5) > 0 ? stacking : candidates);
 
       final pick = pool[rng.nextInt(pool.length)];
       final d = pick[0], k = pick[1], s = pick[2];

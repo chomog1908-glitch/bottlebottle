@@ -72,6 +72,9 @@ class GameController extends ChangeNotifier {
   /// 힌트로 제시된 수. 화면에서 해당 병 두 개를 강조한다.
   Move? hintMove;
 
+  /// 힌트가 들고 있는 남은 수순. 앞에서부터 하나씩 내준다.
+  List<Move> _plan = [];
+
   /// 이 판에서 지금까지 **동시에** 점유했던 빈 병 수의 최대값.
   int _peakEmptiesUsed = 0;
 
@@ -153,6 +156,7 @@ class GameController extends ChangeNotifier {
     hintMove = null;
     _peakEmptiesUsed = 0;
     _peakHistory.clear();
+    _plan = [];
     // 힌트·되돌리기 횟수는 판마다 따로 센다. 다시 시작하면 깨끗한 판으로 친다.
     hintsThisLevel = 0;
     undosThisLevel = 0;
@@ -187,6 +191,7 @@ class GameController extends ChangeNotifier {
     // 3) 부을 수 있으면 → 붓기
     if (state.canPour(from, index)) {
       state.pour(from, index);
+      _advancePlan(from, index);
       _recordPeak();
       selected = null;
       _emit(GameEvent.move);
@@ -204,6 +209,18 @@ class GameController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 방금 둔 수가 들고 있던 수순의 첫 수였다면 한 칸 전진시킨다.
+  /// 아니면 사용자가 다른 길로 간 것이므로 수순을 버린다.
+  void _advancePlan(int from, int to) {
+    if (_plan.isEmpty) return;
+    final m = _plan.first;
+    if (m.from == from && m.to == to) {
+      _plan.removeAt(0);
+    } else {
+      _plan.clear();
+    }
+  }
+
   /// 한 수를 둔 뒤 빈 병 사용 기록을 갱신한다.
   void _recordPeak() {
     _peakHistory.add(_peakEmptiesUsed);
@@ -218,6 +235,8 @@ class GameController extends ChangeNotifier {
     selected = null;
     rejected = null;
     hintMove = null;
+    // 되돌리면 판이 수순보다 뒤로 갔으므로 들고 있던 수순은 버린다.
+    _plan.clear();
     undosThisLevel++;
     _emit(GameEvent.undo);
     notifyListeners();
@@ -247,14 +266,36 @@ class GameController extends ChangeNotifier {
   /// 다음에 둘 만한 수를 찾아 표시한다. **횟수 제한 없음.**
   ///
   /// 대신 둬 주지는 않는다. 직접 두는 재미를 남겨두기 위함이다.
+  ///
+  /// 한 번 찾은 **수순 전체를 들고 있다가 앞에서부터 하나씩 내준다.**
+  /// 매번 새로 찾으면 안 된다 — 탐색기는 최단 해답을 보장하지 않으므로
+  /// 같은 판에서도 호출할 때마다 다른 해답을 내놓을 수 있고, 그러면
+  /// 방금 둔 수를 되돌리는 수를 알려주며 두 수 사이를 영원히 왕복한다.
+  /// (레벨 1에서 실제로 그랬다. 힌트만 눌러서는 판이 끝나지 않았다.)
   void requestHint() {
     if (isSolved) return;
-    hintMove = Solver.hint(state);
+    hintMove = _nextPlannedMove();
     selected = null;
     rejected = null;
     hintsThisLevel++;
     _emit(GameEvent.hint);
     notifyListeners();
+  }
+
+  /// 들고 있는 수순에서 다음 한 수를 꺼낸다. 쓸 수 없으면 새로 찾는다.
+  Move? _nextPlannedMove() {
+    // 들고 있던 수순이 지금 판에서 그대로 통하면 그걸 쓴다.
+    while (_plan.isNotEmpty) {
+      final m = _plan.first;
+      if (state.canPour(m.from, m.to)) return m;
+      // 사용자가 다른 길로 갔다면 남은 수순은 의미가 없다.
+      _plan.clear();
+    }
+
+    final result = Solver.solve(state);
+    if (!result.solved) return null;
+    _plan = List<Move>.of(result.moves);
+    return _plan.isEmpty ? null : _plan.first;
   }
 
   /// 이 병이 힌트에 관련되어 있는가. 화면 강조에 쓴다.
