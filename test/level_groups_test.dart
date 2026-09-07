@@ -75,11 +75,22 @@ void main() {
   });
 
   group('무한 레벨', () {
-    test('멀리 간 사람에게는 목록이 더 길게 펼쳐진다', () {
+    test('누구에게나 같은 목록이 보인다', () {
+      // 예전에는 도달한 곳보다 150레벨 앞까지만 폈다. 레벨이 끝없었고 그 뒤로는
+      // 같은 난이도가 반복될 뿐이라 그걸로 충분했다.
+      //
+      // 지금은 701부터 규칙이 계속 바뀐다. 앞을 감추면 그 레벨이 없는 것과 같다.
+      // (레벨 431에서 목록을 열었더니 700까지만 보여, 2100레벨이 숨어 있었다.)
       final near = LevelGroups.bands(1).last.lastLevel;
-      final far = LevelGroups.bands(2000).last.lastLevel;
-      expect(far, greaterThan(near));
-      expect(far, greaterThanOrEqualTo(2000));
+      final far = LevelGroups.bands(431).last.lastLevel;
+      expect(near, far, reason: '도달한 곳에 따라 보이는 범위가 달라진다');
+      expect(near, greaterThanOrEqualTo(LevelConfig.lastLevel));
+    });
+
+    test('끝을 넘어서면 그만큼 더 펼친다', () {
+      // 마지막 구간은 계속 이어지므로 끝에 다다라도 길이 막히면 안 된다.
+      final far = LevelGroups.bands(LevelConfig.lastLevel + 300).last.lastLevel;
+      expect(far, greaterThan(LevelConfig.lastLevel));
     });
 
     test('아직 안 간 곳도 미리 보여준다', () {

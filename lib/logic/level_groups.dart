@@ -83,12 +83,24 @@ class DifficultyBand {
 /// **어떤 묶음도 잠기지 않는다.** 첫 판부터 마지막까지 언제든 열 수 있다.
 /// 잠금은 실력이 아니라 인내심을 시험하는 장치다. 이 게임은 그런 걸 두지 않는다.
 class LevelGroups {
-  /// 레벨이 무한하므로 끝없는 구간은 이만큼씩 끊어 보여준다.
+  /// 한 묶음이 너무 길어지지 않도록 끊는 단위.
   static const int endlessBlock = 50;
 
-  /// 어디까지 펼쳐 둘지. 도달한 곳보다 넉넉히 앞까지 만들어 둔다.
-  static int _horizon(int reachedLevel) =>
-      reachedLevel + 150 > 700 ? reachedLevel + 150 : 700;
+  /// 어디까지 펼쳐 둘지.
+  ///
+  /// **끝까지 보여준다.** 예전에는 도달한 곳보다 150레벨 앞까지만 폈다.
+  /// 레벨이 끝없었고 그 뒤로는 같은 난이도가 반복될 뿐이라 그걸로 충분했다.
+  ///
+  /// 지금은 701부터 규칙이 계속 바뀐다. 앞에 무엇이 기다리는지 보이지 않으면
+  /// **그 레벨이 없는 것과 같다.** 실제로 레벨 431에서 목록을 열었을 때
+  /// 700까지밖에 보이지 않아, 새로 만든 2100레벨이 통째로 숨어 있었다.
+  ///
+  /// 도달한 곳이 끝을 넘어서면 그만큼 더 펼친다. 마지막 구간은 계속 이어지므로
+  /// 끝에 다다르셔도 길이 막히지 않는다.
+  static int _horizon(int reachedLevel) {
+    const end = LevelConfig.lastLevel;
+    return reachedLevel + 150 > end ? reachedLevel + 150 : end;
+  }
 
   /// [reachedLevel]까지 도달한 사람에게 보여줄 난이도 목록.
   static List<DifficultyBand> bands(int reachedLevel) {

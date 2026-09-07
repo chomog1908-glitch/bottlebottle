@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:bottlebottle/logic/generator.dart';
 import 'package:bottlebottle/logic/level_config.dart';
+import 'package:bottlebottle/logic/level_groups.dart';
 import 'package:bottlebottle/logic/solver.dart';
 import 'package:bottlebottle/model/rule_set.dart';
 
@@ -77,4 +78,49 @@ void main() {
           reason: '레벨 $lv이 싱겁다 (${c.rules})');
     }
   }, timeout: const Timeout(Duration(seconds: 120)));
+  group('레벨 목록이 새 레벨을 감춘다면 없는 것과 같다', () {
+    // 실제로 겪었다. 레벨 431에서 목록을 열었더니 700까지밖에 보이지 않아,
+    // 새로 만든 2100레벨이 통째로 숨어 있었다.
+    test('레벨 1에서도 끝까지 보인다', () {
+      final bands = LevelGroups.bands(1);
+      expect(bands.last.lastLevel, greaterThanOrEqualTo(LevelConfig.lastLevel),
+          reason: '목록이 중간에서 끊긴다');
+    });
+
+    test('규칙 구간의 난이도 이름이 모두 목록에 나온다', () {
+      final names = LevelGroups.bands(1).map((b) => b.name).toSet();
+      for (final n in ['이웃 제한', '전용 병', '굳는 병', '못 비우는 병', '모든 규칙']) {
+        expect(names, contains(n), reason: '$n 구간이 목록에 없다');
+      }
+    });
+
+    test('묶음이 빈틈없이 이어진다', () {
+      var expected = 1;
+      for (final b in LevelGroups.bands(1)) {
+        for (final g in b.groups) {
+          expect(g.firstLevel, expected, reason: '레벨 $expected 앞뒤가 어긋난다');
+          expected = g.lastLevel + 1;
+        }
+      }
+      expect(expected - 1, greaterThanOrEqualTo(LevelConfig.lastLevel));
+    });
+
+    test('끝에 다다라도 길이 막히지 않는다', () {
+      // 마지막 구간은 계속 이어진다. 2800을 넘겨도 목록이 나와야 한다.
+      final bands = LevelGroups.bands(LevelConfig.lastLevel + 100);
+      expect(bands.last.lastLevel,
+          greaterThan(LevelConfig.lastLevel));
+      expect(() => LevelGroups.groupForLevel(LevelConfig.lastLevel + 50),
+          returnsNormally);
+    });
+
+    test('목록을 만드는 데 오래 걸리지 않는다', () {
+      // 2800레벨을 통째로 펼치므로 느려지면 화면이 멈춘다.
+      final sw = Stopwatch()..start();
+      LevelGroups.bands(431);
+      sw.stop();
+      expect(sw.elapsedMilliseconds, lessThan(500));
+    });
+  });
+
 }
