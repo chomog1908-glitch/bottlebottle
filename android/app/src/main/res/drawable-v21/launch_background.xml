@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="?android:colorBackground" />
+<!--
+  앱을 켤 때 플러터가 첫 화면을 그리기 전까지 보이는 그림.
 
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
+  기본값은 흰색이라, 어두운 테마를 쓰시면 켤 때마다 흰 화면이 번쩍인다.
+  아이콘 배경에서 뽑은 색을 깔고 병을 가운데 놓아, 아이콘에서 앱으로
+  자연스럽게 이어지게 한다.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_bg" />
+    <item>
         <bitmap
             android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+            android:src="@mipmap/splash_bottles" />
+    </item>
 </layer-list>

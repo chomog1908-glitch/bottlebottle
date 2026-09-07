@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  적응형 아이콘. 안드로이드 8.0(API 26)부터 쓰인다.
+
+  배경과 앞 그림을 나눠 두면 기기가 제 모양대로(동그라미·사각형·물방울) 깎아
+  쓰고, 누를 때 두 층이 살짝 어긋나며 움직인다. 통짜 그림을 넣으면 이미 깎인
+  모서리가 한 번 더 깎여 어색해진다.
+
+  가운데 72dp만 항상 보이고 바깥 18dp씩은 잘려 나갈 수 있으므로,
+  병은 그 안전 영역 안에 들어가도록 앉혀 두었다.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 앱을 켤 때 잠깐 보이는 바탕. 아이콘 배경에서 뽑은 색이라 이어져 보인다. -->
+    <color name="launch_bg">#D7DCE8</color>
+</resources>
