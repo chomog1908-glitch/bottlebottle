@@ -12,7 +12,21 @@ class GameState {
   /// 병 하나에 담기는 최대 칸 수. 원작과 동일하게 4.
   static const int defaultCapacity = 4;
 
+  /// 병 하나의 높이. **모든 병이 같은 높이일 때**의 값이다.
+  ///
+  /// 높이가 제각각인 판에서는 이 값이 가장 큰 병의 높이를 가리킨다.
+  /// 규칙 판정은 전부 [capacityOf]를 거치므로, 이 값은 화면이 칸을 그릴 때와
+  /// 예전 저장을 읽을 때만 쓴다.
   final int capacity;
+
+  /// 병마다의 높이. 모든 병이 같으면 전부 [capacity]와 같은 값이다.
+  ///
+  /// **왜 병별로 두는가** — 레벨 501부터는 빈 병이 점점 작아진다. 예전에는
+  /// 빈 병을 2개에서 1개로 줄여 난이도를 올렸는데, 그게 절벽이라 어머니가
+  /// 거기서 막히셨다. 개수를 줄이는 대신 **좁히면** 같은 축을 훨씬 완만하게
+  /// 쓸 수 있다. 8칸 → 6칸 → 4칸처럼 이어지므로 계단이 촘촘해진다.
+  final List<int> _capacities;
+
   final List<List<int>> _bottles;
   final List<Move> _history = [];
 
@@ -28,23 +42,49 @@ class GameState {
   /// 이 병이 전용으로 굳은 색. 잠기지 않았으면 null.
   final List<int?> _claimed;
 
-  GameState._(this._bottles, this.capacity, this.rules, this._startedEmpty,
-      this._claimed);
+  GameState._(this._bottles, this.capacity, this._capacities, this.rules,
+      this._startedEmpty, this._claimed);
+
+  /// [i]번 병의 높이. 규칙 판정은 전부 이 값을 쓴다.
+  int capacityOf(int i) => _capacities[i];
+
+  /// 병마다 높이가 다른 판인가. 화면과 탐색기가 갈림길에서 참고한다.
+  bool get hasMixedCapacities {
+    for (final c in _capacities) {
+      if (c != _capacities.first) return true;
+    }
+    return false;
+  }
 
   /// 병의 내용물 목록으로 상태를 만든다. 입력은 복사되므로 이후 변경에 영향받지 않는다.
+  /// [capacities]를 주면 병마다 높이가 달라진다. 주지 않으면 전부 [capacity]다.
   factory GameState(
     List<List<int>> bottles, {
     int capacity = defaultCapacity,
+    List<int>? capacities,
     RuleSet rules = RuleSet.classic,
   }) {
-    for (final b in bottles) {
-      if (b.length > capacity) {
-        throw ArgumentError('병에 용량($capacity)보다 많은 ${b.length}칸이 들어있습니다.');
+    if (capacities != null && capacities.length != bottles.length) {
+      throw ArgumentError('병 ${bottles.length}개인데 높이는 ${capacities.length}개입니다.');
+    }
+    final caps = capacities == null
+        ? List<int>.filled(bottles.length, capacity)
+        : List<int>.of(capacities);
+    for (var i = 0; i < bottles.length; i++) {
+      if (bottles[i].length > caps[i]) {
+        throw ArgumentError(
+            '$i번 병에 용량(${caps[i]})보다 많은 ${bottles[i].length}칸이 들어있습니다.');
       }
+    }
+    // 높이가 섞이면 capacity는 가장 큰 병을 가리킨다. 화면이 칸을 그릴 때 쓴다.
+    var tallest = capacity;
+    for (final c in caps) {
+      if (c > tallest) tallest = c;
     }
     final state = GameState._(
       [for (final b in bottles) List<int>.of(b)],
-      capacity,
+      tallest,
+      caps,
       rules,
       [for (final b in bottles) b.isEmpty],
       List<int?>.filled(bottles.length, null),
@@ -63,10 +103,19 @@ class GameState {
     required int capacity,
     required RuleSet rules,
     required List<bool> startedEmpty,
+    List<int>? capacities,
   }) {
+    final caps = capacities == null
+        ? List<int>.filled(bottles.length, capacity)
+        : List<int>.of(capacities);
+    var tallest = capacity;
+    for (final c in caps) {
+      if (c > tallest) tallest = c;
+    }
     final state = GameState._(
       [for (final b in bottles) List<int>.of(b)],
-      capacity,
+      tallest,
+      caps,
       rules,
       List<bool>.of(startedEmpty),
       List<int?>.filled(bottles.length, null),
@@ -124,7 +173,7 @@ class GameState {
 
   bool isEmptyBottle(int i) => _bottles[i].isEmpty;
 
-  bool isFull(int i) => _bottles[i].length == capacity;
+  bool isFull(int i) => _bottles[i].length == _capacities[i];
 
   /// [i]번 병의 맨 위 색. 비어 있으면 null.
   int? topColor(int i) => _bottles[i].isEmpty ? null : _bottles[i].last;
@@ -144,7 +193,8 @@ class GameState {
   /// 한 가지 색으로 가득 찬 병인지. (완성된 병)
   bool isComplete(int i) {
     final b = _bottles[i];
-    return b.length == capacity && topRunLength(i) == capacity;
+    final cap = _capacities[i];
+    return b.length == cap && topRunLength(i) == cap;
   }
 
   /// 모든 병이 비었거나 한 색으로 가득 찼으면 승리.
@@ -165,7 +215,7 @@ class GameState {
     final src = _bottles[from];
     final dst = _bottles[to];
     if (src.isEmpty) return false;
-    if (dst.length >= capacity) return false;
+    if (dst.length >= _capacities[to]) return false;
     if (dst.isNotEmpty && dst.last != src.last) return false;
 
     // 여기부터는 특별 규칙. 없으면 곧바로 통과한다.
@@ -176,7 +226,7 @@ class GameState {
     // 트릭 C — 빈 병에서 출발한 병은 가득 차기 전까지 못 따라낸다.
     if (rules.lockEmptyOrigin &&
         _startedEmpty[from] &&
-        src.length < capacity) {
+        src.length < _capacities[from]) {
       return false;
     }
 
@@ -192,7 +242,7 @@ class GameState {
   /// 맨 위 같은 색 덩어리를 통째로 옮기되, 받는 병의 남은 자리만큼만 간다.
   int pourAmount(int from, int to) {
     if (!canPour(from, to)) return 0;
-    final room = capacity - _bottles[to].length;
+    final room = _capacities[to] - _bottles[to].length;
     final run = topRunLength(from);
     return run < room ? run : room;
   }
@@ -303,6 +353,7 @@ class GameState {
   GameState copy() => GameState._(
         [for (final b in _bottles) List<int>.of(b)],
         capacity,
+        _capacities,
         rules,
         _startedEmpty,
         List<int?>.of(_claimed),
@@ -318,7 +369,22 @@ class GameState {
   /// 그래서 제한이 있으면 순서를 그대로 둔다. 잠금도 마찬가지로 키에 넣는다.
   /// (실측: 이웃 제한이 걸리면 가지 수가 줄어 정규화를 잃은 손해를 메우고도 남는다.)
   String canonicalKey() {
-    final parts = [for (final b in _bottles) b.join(',')];
+    // 높이가 섞인 판에서는 **내용물만으로 같은 병이라고 할 수 없다.**
+    //
+    // 4칸 병에 든 [0,0]과 6칸 병에 든 [0,0]은 내용은 같아도 남은 자리가
+    // 다르므로 둘 수 있는 수가 다르다. 그런데 정렬은 이 둘을 같은 것으로
+    // 묶어버린다. 서로 다른 상태가 하나로 합쳐지면 탐색기는 가 보지 않은
+    // 길을 가 봤다고 착각하고, 있는 해답을 못 찾는다.
+    // (실제로 높이를 섞었더니 한 판 탐색에 6.7초가 들었다. 섞는 데는 24ms다.)
+    //
+    // 그래서 높이를 키에 함께 적는다. 그러면 정렬해도 안전하다 —
+    // 같은 높이·같은 내용물인 병만 서로 바꿔치기할 수 있기 때문이다.
+    final parts = [
+      for (var i = 0; i < _bottles.length; i++)
+        hasMixedCapacities
+            ? '${_capacities[i]}:${_bottles[i].join(',')}'
+            : _bottles[i].join(','),
+    ];
     if (!rules.hasReachLimit && !rules.hasLocks) {
       parts.sort();
       return parts.join('|');

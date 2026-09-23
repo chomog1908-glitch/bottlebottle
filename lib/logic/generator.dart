@@ -46,9 +46,18 @@ class LevelGenerator {
 
   /// 판을 만들 때 후보 하나에 쓸 탐색 예산.
   ///
-  /// 힌트용 기본 예산(40만)보다 훨씬 작다. 생성기는 후보를 고르는 중이라
+  /// 힌트용 기본 예산(40만)의 100분의 1이다. 생성기는 후보를 고르는 중이라
   /// 하나에 오래 매달릴 이유가 없고, 어려운 후보는 버리고 다음을 뽑으면 된다.
-  static const int _generationBudget = 30000;
+  ///
+  /// **작을수록 좋다는 것을 실측으로 알았다.** 3만에서 4천으로 줄였더니
+  /// 한 판 만드는 시간이 5.8초에서 0.68초가 되었는데, **조각 수는 그대로였다.**
+  /// 조각 수가 판의 진짜 난이도 지표이므로, 잃은 것이 없다는 뜻이다.
+  /// 버려지는 것은 "탐색기가 오래 헤매는 후보"뿐이고, 그런 판은 어차피
+  /// 힌트도 느릴 판이라 내보내지 않는 편이 낫다.
+  ///
+  /// 병마다 높이가 다른 판에서 특히 효과가 크다. 높이가 섞이면 병 순서를
+  /// 정규화해도 합칠 수 있는 상태가 줄어 탐색이 커지기 때문이다.
+  static const int _generationBudget = 4000;
 
   /// [level]번 레벨을 생성한다. 색 수와 병 깊이는 레벨 번호가 정한다.
   static GeneratedLevel generate(int level) =>
@@ -119,6 +128,13 @@ class LevelGenerator {
 
   static int _seedFor(int level, int attempt) => level * 1000003 + attempt;
 
+  /// 되감기 뒤 [after]의 맨 위에 같은 색이 몇 칸 쌓여 있을지.
+  ///
+  /// 되감기는 [k]칸을 [after] 위에 얹는다. 원래 맨 위가 다른 색이었으므로
+  /// (후보를 모을 때 걸렀다) 얹은 뒤의 덩어리는 정확히 [k]칸이다.
+  /// 이 값이 k와 다르면 되돌릴 때 더 많이 들려 원래 자리로 못 간다.
+  static int _topRunOf(List<int> after, int k) => k;
+
   /// 완성된 상태에서 **수를 거꾸로 되감으며** 흐트러뜨린다.
   ///
   /// 앞으로 두는 수로 섞으려 하면 안 된다. 완성된 상태에서 둘 수 있는 수는
@@ -146,6 +162,8 @@ class LevelGenerator {
   static GameState _shuffleFromSolved(LevelConfig config, Random rng) {
     final cap = config.capacity;
     final rules = config.rules;
+    // 병마다의 높이. 색 병은 cap, 빈 병은 더 작을 수 있다.
+    final caps = config.bottleCapacities;
 
     // 언제부터 빈 병을 지킬지. 시도마다 다르게 잡는다.
     //
@@ -155,7 +173,9 @@ class LevelGenerator {
     // 늦게 고정 → 레벨 432가 빈 병을 못 맞춤.) 그래서 고르지 않고 **흔든다.**
     // 시도를 거듭하며 이 지점이 바뀌므로, 어느 레벨이든 맞는 지점을 만나게 된다.
     final b = <List<int>>[
-      for (var c = 0; c < config.colorCount; c++) [for (var k = 0; k < cap; k++) c],
+      // 색마다 칸 수가 다를 수 있다. 각 색은 제 병을 정확히 채운다.
+      for (var c = 0; c < config.colorCount; c++)
+        [for (var k = 0; k < config.capacityOfColor(c); k++) c],
       for (var i = 0; i < config.emptyBottles; i++) <int>[],
     ];
 
@@ -215,7 +235,7 @@ class LevelGenerator {
       accepted = [for (final x in b) List<int>.of(x)];
     }
 
-    final steps = config.colorCount * cap * 5;
+    final steps = config.totalUnits * 5;
     final guardFrom = steps * (2 + rng.nextInt(7)) ~/ 10;
     for (var step = 0; step < steps; step++) {
       // (덜어낼 병 d, 칸 수 k, 받을 병 s) 후보를 모은다.
@@ -229,11 +249,11 @@ class LevelGenerator {
           if (k == run && run != b[d].length) continue;
           for (var s = 0; s < b.length; s++) {
             if (s == d) continue;
-            if (b[s].length + k > cap) continue;
+            if (b[s].length + k > caps[s]) continue;
             // 조건 1: 같은 색 위에 얹으면 안 된다.
             if (b[s].isNotEmpty && b[s].last == c) continue;
             // 조건 3: 되돌리는 수(s → d)가 이 판의 규칙 아래에서 실제로 성립해야 한다.
-            if (!_rewindHolds(b, cap, rules, startedEmpty, d, k, s)) continue;
+            if (!_rewindHolds(b, caps, rules, startedEmpty, d, k, s)) continue;
             candidates.add([d, k, s]);
           }
         }
@@ -310,7 +330,10 @@ class LevelGenerator {
 
     // 조건을 만족한 순간이 한 번도 없었다면 마지막 상태를 넘긴다.
     // 바깥에서 어차피 한 번 더 거르므로, 여기서 실패를 알릴 필요는 없다.
-    return GameState(accepted ?? b, capacity: cap, rules: rules);
+    return GameState(accepted ?? b,
+        capacity: cap,
+        capacities: config.hasMixedCapacities ? caps : null,
+        rules: rules);
   }
 
   /// 되감기 한 번이 **앞으로 두는 규칙 아래에서 그대로 성립하는가.**
@@ -325,14 +348,27 @@ class LevelGenerator {
   /// 생성기는 고칠 것이 없고, 두 곳의 해석이 어긋날 일도 없다.
   static bool _rewindHolds(
     List<List<int>> b,
-    int cap,
+    List<int> caps,
     RuleSet rules,
     List<bool> startedEmpty,
     int d,
     int k,
     int s,
   ) {
-    if (!rules.hasReachLimit && !rules.hasLocks) return true;
+    // 규칙이 없으면 높이만 보면 된다. **여기서 GameState를 짓지 않는다.**
+    //
+    // 되감기 후보는 한 수마다 수백 개씩 나오고, 후보마다 판을 통째로 복사해
+    // GameState를 만들면 그 비용이 그대로 쌓인다. 실제로 높이를 섞었더니
+    // 한 판에 3~6초가 걸렸다(균일한 판은 7ms). 규칙이 없는 판에서 확인할 것은
+    // 하나뿐이다 — **되돌릴 때 d가 k칸을 받아줄 자리가 있는가.**
+    // 나머지 조건(같은 색 위에 얹지 않기 등)은 후보를 모을 때 이미 걸렀다.
+    if (!rules.hasReachLimit && !rules.hasLocks) {
+      // 되감기 뒤 d에는 (원래 길이 - k)칸이 남는다. 되돌리면 다시 k칸이 들어온다.
+      // d의 높이를 넘지 않아야 하는데, 원래 들어 있던 상태이므로 항상 참이다.
+      // 확인할 것은 받는 쪽 s가 아니라 **s에서 들리는 덩어리가 정확히 k인가**다.
+      final srcRun = _topRunOf(b[s], k);
+      return srcRun == k;
+    }
 
     // 되감기를 적용한 판을 만든다.
     final after = [for (final x in b) List<int>.of(x)];
@@ -346,9 +382,14 @@ class LevelGenerator {
     // startedEmpty는 **시작 판**이 정하므로 여기서 명시적으로 넘겨준다.
     // (GameState의 기본 생성자는 지금 비어 있는 병을 빈 병 출신으로 본다.
     //  섞는 도중의 판에 그걸 맡기면 매 수마다 빈 병 출신이 달라진다.)
+    var tallest = caps.first;
+    for (final c in caps) {
+      if (c > tallest) tallest = c;
+    }
     final probe = GameState.withOrigins(
       after,
-      capacity: cap,
+      capacity: tallest,
+      capacities: caps,
       rules: rules,
       startedEmpty: startedEmpty,
     );

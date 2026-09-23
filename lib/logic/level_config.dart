@@ -26,22 +26,75 @@ class LevelConfig {
   /// 이 레벨에 적용되는 규칙. 레벨 700까지는 [RuleSet.classic]이다.
   final RuleSet rules;
 
+  /// 빈 병의 높이. null이면 [capacity]와 같다(= 모든 병이 같은 높이).
+  ///
+  /// **빈 병을 줄이는 대신 좁힌다.** 빈 병 개수를 2개에서 1개로 떨어뜨리면
+  /// 난이도가 계단이 아니라 절벽이 된다. 실제로 어머니가 레벨 500 언저리에서
+  /// 막히셨다. 개수는 2개로 두고 높이만 8칸 → 6칸 → 4칸으로 좁히면
+  /// 같은 축을 훨씬 촘촘한 계단으로 쓸 수 있다.
+  ///
+  /// 두 빈 병의 높이를 다르게 줄 수도 있다(큰 것 하나 + 작은 것 하나).
+  final List<int>? emptyCapacities;
+
+  /// 색 병의 높이들. null이면 전부 [capacity]다.
+  ///
+  /// **색 하나가 병 하나를 정확히 채운다**는 약속은 그대로다. 그래서 이 목록이
+  /// 곧 색별 칸 수이기도 하다. 5칸 병에 담을 색은 5칸, 3칸 병에 담을 색은 3칸.
+  /// 그래야 "가득 차면 완성"이 성립한다.
+  ///
+  /// 길이가 [colorCount]보다 짧으면 앞에서부터 돌려 쓴다.
+  final List<int>? colorCapacities;
+
+  /// [i]번째 색이 차지하는 칸 수 (= 그 색을 담을 병의 높이).
+  int capacityOfColor(int i) => colorCapacities == null
+      ? capacity
+      : colorCapacities![i % colorCapacities!.length];
+
+  /// 병마다의 높이. 앞쪽이 색 병, 뒤쪽이 빈 병이다.
+  List<int> get bottleCapacities => [
+        for (var i = 0; i < colorCount; i++) capacityOfColor(i),
+        for (var i = 0; i < emptyBottles; i++)
+          emptyCapacities == null
+              ? capacity
+              : emptyCapacities![i % emptyCapacities!.length],
+      ];
+
+  /// 병마다 높이가 다른 판인가.
+  bool get hasMixedCapacities {
+    final caps = bottleCapacities;
+    for (final c in caps) {
+      if (c != caps.first) return true;
+    }
+    return false;
+  }
+
   const LevelConfig({
     required this.level,
     required this.colorCount,
     required this.emptyBottles,
     required this.capacity,
     this.rules = RuleSet.classic,
+    this.emptyCapacities,
+    this.colorCapacities,
   });
 
   /// 화면에 놓이는 전체 병 수.
   int get bottleCount => colorCount + emptyBottles;
 
-  /// 총 액체 칸 수.
-  int get totalUnits => colorCount * capacity;
+  /// 총 액체 칸 수. 빈 병은 비어 있으므로 세지 않는다.
+  ///
+  /// 색마다 칸 수가 다를 수 있으므로 곱셈이 아니라 합으로 센다.
+  int get totalUnits {
+    if (colorCapacities == null) return colorCount * capacity;
+    var n = 0;
+    for (var i = 0; i < colorCount; i++) {
+      n += capacityOfColor(i);
+    }
+    return n;
+  }
 
   /// 색으로 쓸 수 있는 최대 가짓수. 팔레트가 준비한 색 수와 같아야 한다.
-  static const int maxColors = 15;
+  static const int maxColors = 19;
 
   /// 병의 최대 깊이.
   static const int maxCapacity = 8;
@@ -96,7 +149,11 @@ class LevelConfig {
     [500, 15, 8, 2],
 
     // 색과 깊이로 올릴 수 있는 데까지 올렸다. 여기가 기본 규칙의 천장이다.
-    [700, 15, 8, 1], // 16병
+    //
+    // **빈 병 1개 구간은 여기 없다.** 예전에는 501~700이 빈 병 1개였는데,
+    // 2개에서 1개로 떨어지는 것이 계단이 아니라 절벽이었다. 실제로 어머니가
+    // 그 언저리에서 막히셨다. 그 구간은 [_lastBandStart] 뒤로 옮겼다.
+    // 없앤 것이 아니라 **가장 어려운 곳**으로 자리를 바꾼 것이다.
   ];
 
   /// 규칙 구간표. `[이 레벨까지, 색 수, 깊이, 빈 병 수, 격자, 규칙코드]`
@@ -167,10 +224,21 @@ class LevelConfig {
     // 마지막 구간: 이웃 제한과 트릭이 함께 걸린다.
     [2400, 10, 5, 2, 4, _rReach21A], // 2201~2400
     [2600, 10, 5, 2, 4, _rReach21AB],
-    [1 << 30, 10, 5, 2, 4, _rReach21AC], // 2601~2800 (그 뒤로도 같은 구성)
+    [2800, 10, 5, 2, 4, _rReach21AC], // 2601~2800
+
+    // 옛 501~700이 여기로 왔다. 빈 병이 **하나뿐인** 구간이다.
+    //
+    // 규칙도 이웃 제한도 없는 순수한 판인데, 숨 쉴 곳이 하나라 가장 어렵다.
+    // 다 지나오신 분을 위한 자리다.
+    [1 << 30, 15, 8, 1, 0, _rNone], // 2801~  16병
   ];
 
+  /// 마지막 구간(옛 501~700)이 시작하는 레벨.
+  static const int _lastBandStart = 2801;
+
   // 규칙코드. 표를 const로 두려면 RuleSet을 직접 넣을 수 없어 번호로 적는다.
+  /// 규칙 없음. 기본 규칙 그대로다.
+  static const int _rNone = 0;
   static const int _rReach32 = 1;
   static const int _rReach22 = 2;
   static const int _rReach21 = 3;
@@ -260,7 +328,8 @@ class LevelConfig {
     if (level <= 1600) return '전용 병';
     if (level <= 1900) return '굳는 병';
     if (level <= 2200) return '못 비우는 병';
-    return '모든 규칙';
+    if (level < _lastBandStart) return '모든 규칙';
+    return '빈 병 하나';
   }
 
   @override
