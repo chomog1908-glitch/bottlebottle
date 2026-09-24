@@ -1,0 +1,285 @@
+<title>병 높이 수정 보고</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --ground:#F7F8FA; --surface:#FFFFFF; --sunken:#EDEFF3;
+    --edge:#DCE0E8; --ink:#161A21; --muted:#5F6878;
+    --accent:#0E7C78; --accent-soft:#DCF0EF;
+    --danger:#B3323C; --danger-soft:#FBE7E8;
+    --ok:#1F7A3D; --ok-soft:#E2F2E7;
+    --warn:#8A5A00; --warn-soft:#FBF0DC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:#0F1115; --surface:#171A21; --sunken:#12141A;
+      --edge:#2A2F3A; --ink:#E6E9EF; --muted:#8B93A3;
+      --accent:#5EC8C4; --accent-soft:#14312F;
+      --danger:#E5606A; --danger-soft:#33191C;
+      --ok:#6CC98A; --ok-soft:#16281C;
+      --warn:#E5B95E; --warn-soft:#2C2413;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:#0F1115; --surface:#171A21; --sunken:#12141A;
+    --edge:#2A2F3A; --ink:#E6E9EF; --muted:#8B93A3;
+    --accent:#5EC8C4; --accent-soft:#14312F;
+    --danger:#E5606A; --danger-soft:#33191C;
+    --ok:#6CC98A; --ok-soft:#16281C;
+    --warn:#E5B95E; --warn-soft:#2C2413;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:"IBM Plex Sans KR",system-ui,sans-serif;
+    font-size:16px; line-height:1.75;
+  }
+  code { font-family:"JetBrains Mono",ui-monospace,monospace; }
+  .wrap { max-width:46rem; margin:0 auto; padding:3rem 1.25rem 5rem; }
+
+  header { border-bottom:2px solid var(--ink); padding-bottom:1.5rem; margin-bottom:2rem; }
+  .eyebrow {
+    font-family:"JetBrains Mono",monospace; font-size:.72rem;
+    letter-spacing:.16em; color:var(--accent); margin:0 0 .6rem;
+  }
+  h1 { font-size:2.1rem; margin:0 0 .5rem; line-height:1.25; text-wrap:balance; font-weight:600; }
+  .sub { margin:0; color:var(--muted); }
+
+  h2 {
+    font-size:1.15rem; margin:2.8rem 0 1rem; font-weight:600;
+    padding-bottom:.5rem; border-bottom:1px solid var(--edge);
+  }
+  h3 {
+    font-size:1rem; margin:1.8rem 0 .6rem; font-weight:600;
+    display:flex; align-items:baseline; gap:.6rem;
+  }
+  h3 .n {
+    font-family:"JetBrains Mono",monospace; font-size:.72rem; font-weight:700;
+    color:var(--danger); background:var(--danger-soft);
+    padding:.12rem .45rem; border-radius:4px;
+  }
+  p { margin:0 0 .9rem; }
+  .lead { color:var(--muted); }
+
+  .fix {
+    border:1px solid var(--edge); border-left:3px solid var(--danger);
+    border-radius:8px; background:var(--surface);
+    padding:1rem 1.2rem; margin:0 0 1.2rem;
+  }
+  .fix p:last-child { margin-bottom:0; }
+  .sym { color:var(--danger); font-weight:600; }
+  .cause { color:var(--muted); }
+
+  table { width:100%; border-collapse:collapse; margin:0 0 1rem; font-size:.92rem; }
+  th, td { text-align:left; padding:.55rem .7rem; border-bottom:1px solid var(--edge); vertical-align:top; }
+  th { font-size:.72rem; letter-spacing:.09em; color:var(--muted); font-weight:600; text-transform:uppercase; }
+  td.num { font-family:"JetBrains Mono",monospace; font-variant-numeric:tabular-nums; }
+  tbody tr:last-child td { border-bottom:0; }
+  .scroll { overflow-x:auto; }
+
+  code {
+    background:var(--sunken); border:1px solid var(--edge);
+    padding:.08em .38em; border-radius:4px; font-size:.87em;
+  }
+  pre {
+    background:var(--sunken); border:1px solid var(--edge); border-radius:8px;
+    padding:.9rem 1.1rem; overflow-x:auto; margin:0 0 1rem;
+    font-family:"JetBrains Mono",monospace; font-size:.82rem; line-height:1.65;
+  }
+  pre code { background:none; border:0; padding:0; font-size:inherit; }
+
+  .callout { border-radius:8px; padding:1rem 1.15rem; margin:0 0 1.2rem; border:1px solid; }
+  .callout p:last-child { margin-bottom:0; }
+  .callout .tag {
+    font-family:"JetBrains Mono",monospace; font-size:.7rem; letter-spacing:.1em;
+    display:block; margin-bottom:.45rem; font-weight:700;
+  }
+  .lesson { background:var(--accent-soft); border-color:var(--accent); }
+  .lesson .tag { color:var(--accent); }
+  .caution { background:var(--warn-soft); border-color:var(--warn); }
+  .caution .tag { color:var(--warn); }
+  .sorry { background:var(--danger-soft); border-color:var(--danger); }
+  .sorry .tag { color:var(--danger); }
+
+  footer {
+    margin-top:3rem; padding-top:1.5rem; border-top:1px solid var(--edge);
+    color:var(--muted); font-size:.88rem;
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">BOTTLEBOTTLE · 2026-09-24</p>
+    <h1>병 높이 수정 보고</h1>
+    <p class="sub">레벨 501~700을 병마다 높이가 다른 구간으로 만들면서 고친 것들.
+       <b>대부분 폰에 올려 눈으로 보고 찾았다.</b> 숫자만 재고 끝냈으면 전부 놓쳤다.</p>
+  </header>
+
+  <h2>무엇을 만들었나</h2>
+  <p class="lead">색과 깊이는 500에서 천장에 닿았다. 예전에는 거기서 빈 병을 2개에서 1개로
+     줄여 난이도를 올렸는데, 그게 계단이 아니라 절벽이었다. 실제로 그 언저리에서 막히셨다.</p>
+  <p>그 구간은 <code>2801~</code> 로 옮기고, 501~700은 <b>병마다 높이가 다른 판</b>으로 새로 채웠다.
+     색 하나가 제 병을 정확히 채운다는 약속은 그대로라, 병 높이가 곧 그 색의 칸 수다.</p>
+
+  <div class="scroll">
+  <table>
+    <thead><tr><th>구간</th><th>색</th><th>병 높이</th><th class="num">병</th><th class="num">조각</th></tr></thead>
+    <tbody>
+      <tr><td>501~540</td><td>12</td><td>6, 7칸</td><td class="num">14</td><td class="num">38</td></tr>
+      <tr><td>541~580</td><td>12</td><td>6, 7, 8칸</td><td class="num">14</td><td class="num">40</td></tr>
+      <tr><td>581~620</td><td>18</td><td>5, 6, 7칸</td><td class="num">20</td><td class="num">55</td></tr>
+      <tr><td>621~660</td><td>18</td><td>6, 7, 8칸</td><td class="num">20</td><td class="num">59</td></tr>
+      <tr><td>661~700</td><td>18</td><td>6, 7, 8칸 · 빈 병 8+6</td><td class="num">20</td><td class="num">59</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>난이도는 <b>조각 수</b>로 잰다. 해답 길이는 탐색기가 짧은 답을 찾느냐 마느냐에 따라
+     흔들려서, 판의 어려움이 아니라 탐색기의 운을 재게 된다.</p>
+
+  <h2>고친 것</h2>
+
+  <h3><span class="n">01</span> 화면이 병을 판 전체의 높이로 그렸다</h3>
+  <div class="fix">
+    <p class="sym">증상 — 4칸 병이 “5칸인데 한 칸 빈 병”처럼 보였다.</p>
+    <p class="cause">가득 찬 병에 부으려다 안 되는 일이 생긴다. 규칙상 맞는 동작인데
+       <b>화면이 거짓말을 했으므로 버그로 보인다.</b></p>
+    <p><code>BottleWidget</code> 에 <code>state.capacity</code>(판 전체)를 넘기고 있었다.
+       <code>state.capacityOf(i)</code>(그 병)로 바꿨다.</p>
+  </div>
+
+  <h3><span class="n">02</span> 키가 다른 병이 공중에 뜬 것처럼 보였다</h3>
+  <div class="fix">
+    <p class="sym">증상 — 짧은 병이 줄 가운데 떠 있어 어디가 바닥인지 헷갈렸다.</p>
+    <p>줄의 <code>crossAxisAlignment</code> 를 <code>end</code> 로 바꿔 바닥에 맞춰 세웠다.</p>
+  </div>
+
+  <h3><span class="n">03</span> 같은 높이끼리 모이지 않아 어지러웠다</h3>
+  <div class="fix">
+    <p class="sym">증상 — 4,5,4,5…로 번갈아 놓여 판이 들쭉날쭉했다.</p>
+    <p><code>capacityOfColor</code> 가 <code>i % 길이</code> 로 돌려 쓰고 있었다.
+       묶어서 나누도록 고쳐 4,4,4,5,5,5가 되게 했다. 계단처럼 보이고,
+       “이 색은 낮은 병”이라는 것도 자리로 기억할 수 있다.</p>
+  </div>
+
+  <h3><span class="n">04</span> 병이 뭉툭했다</h3>
+  <div class="fix">
+    <p class="sym">증상 — 501의 병이 4~5칸이라 짤막했다. 500이 8칸이었으니 확 낮아졌다.</p>
+    <p class="cause">쉽게 만들려고 높이를 낮춘 것이 원인이었다. 그런데 재보니
+       <b>높이를 낮추는 것이 쉽게 만드는 유일한 길</b>이기도 했다 — 높이를 유지한 후보는
+       전부 500보다 조각이 높았다.</p>
+    <p>높이는 6~8칸으로 유지하고, 난이도는 <b>색 수와 병 개수</b>로 잡기로 했다.
+       501은 색12(2줄)로 시작해 580부터 색18(3줄)로 늘어난다.</p>
+  </div>
+
+  <h3><span class="n">05</span> 저장된 판을 복원하면 앱이 멈췄다</h3>
+  <div class="fix">
+    <p class="sym">증상 — 앱이 1분 넘게 로딩 화면에서 멈췄다. 데이터를 지우면 정상으로 켜졌다.</p>
+    <p class="cause">이전 빌드에서 저장한 판(병 18개)을 지금 설정(병 14개)에 맞추려다 생겼다.
+       난이도표를 고치면 병 개수와 높이가 달라지는데, 그 저장에 맞추려 들면 판이 엉킨다.</p>
+    <p><code>_adoptBoard</code> 가 병별 높이를 빠뜨리고 있던 것도 함께 고쳤다.
+       빠뜨리면 4칸 병이 8칸으로 늘어나 <b>승리 판정이 영영 참이 되지 않는다.</b>
+       개수가 안 맞는 저장은 아예 버리고 새 판으로 연다 — 한 판을 잃을 뿐 게임은 열린다.</p>
+  </div>
+
+  <h2>엔진에서 찾은 버그</h2>
+  <div class="callout lesson">
+    <span class="tag">탐색기가 서로 다른 상태를 합치고 있었다</span>
+    <p>탐색기는 병 순서를 정렬해 같은 상태를 하나로 묶는다. 그런데
+       <b>4칸 병에 든 <code>[0,0]</code> 과 6칸 병에 든 <code>[0,0]</code> 을 같다고 판단</b>했다.
+       내용은 같아도 남은 자리가 다르니 둘 수 있는 수가 다르다.</p>
+    <p>서로 다른 상태가 합쳐지면 탐색기는 가 보지 않은 길을 가 봤다고 착각한다.
+       키에 높이를 함께 적어 고쳤다. <b>한 판 탐색이 6.7초에서 0.93초가 되었다.</b></p>
+  </div>
+
+  <h2>실측</h2>
+  <h3 style="margin-top:1.2rem">생성용 탐색 예산을 30,000에서 4,000으로</h3>
+  <p class="lead">프로파일링해 보니 섞기는 3~36ms인데 탐색이 1.4~5.6초였다. 후보 하나당
+     예산을 다 쓰고 실패하는 것이 원인이었다.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>레벨</th><th class="num">예산 30,000</th><th class="num">예산 4,000</th><th class="num">조각</th></tr></thead>
+    <tbody>
+      <tr><td>590</td><td class="num">2364ms</td><td class="num">284ms</td><td class="num">48 → 48</td></tr>
+      <tr><td>650</td><td class="num">2283ms</td><td class="num">654ms</td><td class="num">55 → 55</td></tr>
+      <tr><td>700</td><td class="num">847ms</td><td class="num">167ms</td><td class="num">62 → 62</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p><b>조각 수가 전부 그대로다.</b> 조각 수가 판의 진짜 난이도 지표이므로 잃은 것이 없다는 뜻이다.
+     버려지는 것은 “탐색기가 오래 헤매는 후보”뿐이고, 그런 판은 어차피 힌트도 느릴 판이라
+     내보내지 않는 편이 낫다. 기존 구간도 함께 빨라졌다(701~2800 표본 최악 0.45초).</p>
+
+  <h3>빈 병을 좁히면 오히려 쉬워진다</h3>
+  <p>빈 병 높이를 줄이면 어려워질 줄 알았는데 반대였다. 되감기가 색을 흩뜨리려면
+     빈 병이 넉넉해야 하는데, 좁으면 <b>애초에 덜 헝클어진 판</b>이 만들어진다.</p>
+  <pre><code>색14 깊7  빈병 7칸×2   해답 47수
+색14 깊7  빈병 4칸×2   해답 29수   ← 좁혔는데 쉬워짐</code></pre>
+
+  <h3>큰 병 하나 + 작은 병 하나 &gt; 중간 두 개</h3>
+  <p>빈칸 총량이 같아도 <b>네 번 비교해 모두</b> 큰1+작은1이 어려웠다.
+     중간 둘이면 어느 쪽에 부어도 비슷해 선택이 쉽지만, 큰1+작은1이면
+     “이 긴 덩어리는 큰 병에만 들어간다”는 제약이 생겨 큰 병을 아껴 써야 한다.</p>
+
+  <h3>팔레트 15색 → 19색</h3>
+  <p>색상(hue)과 밝기만 보고 고르다가 <b>“밝은민트가 밝은회색과 붙는다”는 엉뚱한 결론</b>을 냈다.
+     채도 100%인 민트와 15%인 회색은 눈으로 전혀 헷갈리지 않는데도 그랬다 —
+     색상은 채도가 낮으면 의미를 잃기 때문이다.</p>
+  <p>사람 눈이 느끼는 색 차이(CIE Lab ΔE)로 다시 재니, 기존 15색 중 가장 가까운 짝이
+     ΔE 25.4(짙은청록↔짙은회청)이고 새 네 색은 모두 그보다 멀다.
+     <b>19색 전체의 최소 ΔE도 25.4 그대로다.</b></p>
+  <pre><code>라벤더   #B39DDB   파랑과 ΔE 33.3
+밝은민트 #A7FFEB   밝은회색과 ΔE 33.3
+심홍     #880E4F   분홍과 ΔE 32.6
+크림     #EFEBC8   밝은회색과 ΔE 28.0</code></pre>
+
+  <h2>남은 일과 주의</h2>
+
+  <div class="callout sorry">
+    <span class="tag">시험 폰의 기록을 지웠다</span>
+    <p>앱이 멈춘 원인을 “저장 복원 때문인가”로 가르려고 <code>adb shell pm clear</code> 를 썼다.
+       판단 자체는 맞았지만 <b>되돌릴 수 없는 작업인데 먼저 묻지 않았다.</b></p>
+    <p>지워진 것은 시험용 S21의 진행도이고, 2026-09-07 내보내기 글자가 있으므로
+       설정 → 기록 불러오기로 되돌릴 수 있다.</p>
+  </div>
+
+  <div class="callout caution">
+    <span class="tag">501~700 판이 저장된 폰은 한 판을 잃는다</span>
+    <p>난이도표가 바뀌었으므로 그 구간의 저장은 새 설정과 맞지 않는다.
+       버리고 새 판으로 열도록 해 두었다. 클리어 기록·도전과제·통계는 레벨 번호로 남으므로
+       무사하다. 431레벨에 계시면 해당 구간 저장이 없어 아무 영향이 없다.</p>
+  </div>
+
+  <div class="callout lesson">
+    <span class="tag">배운 것</span>
+    <p>다섯 가지 중 넷은 <b>폰 화면을 보고서야</b> 알았다. 배치·정렬·높이는 숫자로 재면
+       “화면에 들어간다”로 끝나지만, 들어가는 것과 알아보기 쉬운 것은 다른 문제다.</p>
+    <p>멈춤 버그도 로컬 시험에서는 전부 통과했다(복원 184ms, 도전과제 38ms).
+       실기기에 올리지 않았으면 그대로 내보냈을 것이다.</p>
+  </div>
+
+  <h2>상태</h2>
+  <div class="scroll">
+  <table>
+    <tbody>
+      <tr><td>테스트</td><td class="num">236개 전부 통과</td></tr>
+      <tr><td><code>flutter analyze</code></td><td class="num">경고 0건</td></tr>
+      <tr><td>레벨</td><td class="num">1~500 그대로 · 501~700 새로 · 701~2800 그대로 · 2801~ 빈 병 하나</td></tr>
+      <tr><td>생성 속도</td><td class="num">전 구간 2초 미만</td></tr>
+      <tr><td>앱 아이콘</td><td class="num">1.png 그대로, 꽉 채움</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <footer>
+    <p style="margin-bottom:.4rem">관련 코드 —
+      <code>lib/model/game_state.dart</code> ·
+      <code>lib/logic/level_config.dart</code> ·
+      <code>lib/logic/generator.dart</code> ·
+      <code>lib/controller/game_controller.dart</code> ·
+      <code>lib/ui/screens/game_screen.dart</code> ·
+      <code>lib/ui/theme/palette.dart</code></p>
+    <p style="margin:0">함께 보기 — <code>데이터보존.html</code> · <code>설치안내.html</code> · <code>PLAN.md</code></p>
+  </footer>
+</div>
