@@ -50,3 +50,4 @@ app.*.map.json
 # 릴리스 서명 열쇠 — 절대 공유하지 않는다 (잃어버리면 업데이트를 못 한다)
 /android/key.properties
 /keystore/
+tool/
