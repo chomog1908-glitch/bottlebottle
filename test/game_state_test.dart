@@ -108,13 +108,33 @@ void main() {
       expect(g.isSolved, isTrue);
     });
 
-    test('덜 찬 병이 있으면 아직 승리가 아니다', () {
+    test('한 색이 두 병에 흩어져 있으면 승리가 아니다', () {
+      // 두 병 다 한 색뿐이지만, 색 0이 아직 한곳에 모이지 않았다.
       final g = GameState([
         [0, 0, 0],
         [1, 1, 1, 1],
         [0],
       ]);
       expect(g.isSolved, isFalse);
+    });
+
+    test('가득 차지 않아도 한 색이면 승리다', () {
+      // 병마다 높이가 다른 판에서는 6칸짜리 색이 8칸 병에 들어갈 수 있다.
+      // 그걸 완성이 아니라고 하면 다 맞춰 놓고도 한 번 더 옮겨야 끝난다.
+      // 그 마지막 한 수는 형식적인 옮김이라, 플레이어에게는
+      // "다 맞췄는데 왜 안 끝나지"로 보인다.
+      final g = GameState(
+        [
+          [0, 0, 0, 0, 0, 0],
+          [1, 1, 1, 1, 1, 1, 1, 1],
+          <int>[],
+        ],
+        capacity: 8,
+        capacities: [8, 8, 8],
+      );
+      expect(g.isComplete(0), isFalse, reason: '가득 차지는 않았다');
+      expect(g.isSettled(0), isTrue, reason: '한 색뿐이다');
+      expect(g.isSolved, isTrue);
     });
 
     test('색이 섞인 병이 있으면 승리가 아니다', () {

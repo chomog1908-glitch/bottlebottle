@@ -190,18 +190,45 @@ class GameState {
     return n;
   }
 
-  /// 한 가지 색으로 가득 찬 병인지. (완성된 병)
+  /// 한 가지 색으로 가득 찬 병인지.
+  ///
+  /// **승리 판정에는 쓰지 않는다.** 병마다 높이가 다른 판에서는 6칸짜리 색이
+  /// 8칸 병에 들어가면 영영 가득 차지 않는다. 그걸 완성이 아니라고 하면,
+  /// 다 맞춰 놓고도 6칸 병으로 한 번 더 옮겨야 끝난다. 그 마지막 한 수는
+  /// 순전히 형식적인 옮김이라 재미가 없고, 플레이어에게는
+  /// "다 맞췄는데 왜 안 끝나지"로 보인다. 승리는 [isSettled]가 판단한다.
+  ///
+  /// 이 값은 **더 따라낼 이유가 없는 병**을 가릴 때 쓴다.
   bool isComplete(int i) {
     final b = _bottles[i];
     final cap = _capacities[i];
     return b.length == cap && topRunLength(i) == cap;
   }
 
-  /// 모든 병이 비었거나 한 색으로 가득 찼으면 승리.
+  /// 한 가지 색으로만 이루어진 병인지. 가득 차지 않아도 된다.
+  ///
+  /// 승리 조건이다. 색 하나가 제 병을 정확히 채우도록 판을 만들므로,
+  /// 모든 병이 한 색이면 각 색은 이미 제자리를 찾은 것이다.
+  bool isSettled(int i) {
+    final b = _bottles[i];
+    return b.isNotEmpty && topRunLength(i) == b.length;
+  }
+
+  /// 모든 병이 비었거나 한 색으로만 이루어져 있고, **색마다 한 병에 모여 있으면** 승리.
+  ///
+  /// 가득 찰 것까지 요구하지 않는다. 자세한 이유는 [isComplete] 참고.
+  ///
+  /// 다만 한 색이 여러 병에 흩어져 있으면 아직 승리가 아니다. 병마다 한 색씩
+  /// 들어 있어도 색 0이 두 병에 나뉘어 있으면 모은 것이 아니기 때문이다.
+  /// ("가득 차야 완성"이던 시절에는 이 조건이 저절로 지켜졌다 —
+  ///  쪼개진 색은 어느 병도 채우지 못했다.)
   bool get isSolved {
+    final seen = <int>{};
     for (var i = 0; i < _bottles.length; i++) {
-      if (_bottles[i].isEmpty) continue;
-      if (!isComplete(i)) return false;
+      final b = _bottles[i];
+      if (b.isEmpty) continue;
+      if (!isSettled(i)) return false;
+      if (!seen.add(b.first)) return false;
     }
     return true;
   }
