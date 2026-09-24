@@ -146,6 +146,9 @@ class GameController extends ChangeNotifier {
   /// 게임을 못 켜게 하는 것보다 조금 덜 복원되는 편이 낫다.
   void restore(int level, List<List<int>> moves, {List<List<int>>? board}) {
     loadLevel(level);
+    // 저장된 보드가 지금 설정과 안 맞으면 그대로 버린다. 난이도표를 고치면
+    // 병 개수나 높이가 달라지는데, 그 저장에 맞추려 들면 판이 엉킨다.
+    // 새로 만든 판으로 여는 편이 낫다 — 한 판을 잃을 뿐 게임은 열린다.
     if (board != null) _adoptBoard(board);
     for (final m in moves) {
       if (m.length < 2) break;
@@ -164,16 +167,25 @@ class GameController extends ChangeNotifier {
   /// 보드가 이 레벨의 규격과 어긋나면(칸 수가 넘치는 등) 조용히 무시하고
   /// 생성된 판을 쓴다. 저장이 손상돼도 게임은 켜져야 한다.
   void _adoptBoard(List<List<int>> board) {
-    final cap = _generated.config.capacity;
+    final config = _generated.config;
+    final cap = config.capacity;
     if (board.length != _generated.state.bottleCount) return;
-    for (final b in board) {
-      if (b.length > cap) return;
+
+    // **병마다의 높이를 함께 넘겨야 한다.** 빠뜨리면 판 전체가 같은 높이가 되어,
+    // 4칸짜리 병이 8칸으로 늘어난다. 그러면 승리 판정이 영영 참이 되지 않고
+    // 화면도 실제와 다르게 그려진다.
+    final caps = config.bottleCapacities;
+    for (var i = 0; i < board.length; i++) {
+      if (board[i].length > caps[i]) return;
     }
+
     try {
       _generated = GeneratedLevel(
-        config: _generated.config,
+        config: config,
         state: GameState(board,
-            capacity: cap, rules: _generated.config.rules),
+            capacity: cap,
+            capacities: config.hasMixedCapacities ? caps : null,
+            rules: config.rules),
         solutionLength: _generated.solutionLength,
         attempts: _generated.attempts,
       );

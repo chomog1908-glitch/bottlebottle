@@ -46,18 +46,43 @@ class LevelConfig {
   final List<int>? colorCapacities;
 
   /// [i]번째 색이 차지하는 칸 수 (= 그 색을 담을 병의 높이).
-  int capacityOfColor(int i) => colorCapacities == null
-      ? capacity
-      : colorCapacities![i % colorCapacities!.length];
+  ///
+  /// **같은 높이끼리 모여 있도록** 나눈다. 4,5,4,5…처럼 번갈아 놓으면 판이
+  /// 들쭉날쭉해 보여 어지럽다. 4,4,4,5,5,5처럼 모아 두면 계단 모양이 되어
+  /// 정돈돼 보이고, "이 색은 낮은 병"이라는 것도 자리로 기억하실 수 있다.
+  ///
+  /// 색 수가 높이 가짓수로 나누어떨어지지 않으면 앞쪽(낮은 병)에 한 개씩 더 준다.
+  int capacityOfColor(int i) {
+    final caps = colorCapacities;
+    if (caps == null) return capacity;
+    final groups = caps.length;
+    final base = colorCount ~/ groups;
+    final extra = colorCount % groups;
+    var start = 0;
+    for (var g = 0; g < groups; g++) {
+      final count = base + (g < extra ? 1 : 0);
+      if (i < start + count) return caps[g];
+      start += count;
+    }
+    return caps.last;
+  }
 
   /// 병마다의 높이. 앞쪽이 색 병, 뒤쪽이 빈 병이다.
-  List<int> get bottleCapacities => [
-        for (var i = 0; i < colorCount; i++) capacityOfColor(i),
-        for (var i = 0; i < emptyBottles; i++)
-          emptyCapacities == null
-              ? capacity
-              : emptyCapacities![i % emptyCapacities!.length],
-      ];
+  ///
+  /// 색 병은 낮은 것부터, 빈 병도 낮은 것부터 놓는다. 그래야 판이 계단처럼
+  /// 보이고 어지럽지 않다.
+  List<int> get bottleCapacities {
+    final empties = [
+      for (var i = 0; i < emptyBottles; i++)
+        emptyCapacities == null
+            ? capacity
+            : emptyCapacities![i % emptyCapacities!.length],
+    ]..sort();
+    return [
+      for (var i = 0; i < colorCount; i++) capacityOfColor(i),
+      ...empties,
+    ];
+  }
 
   /// 병마다 높이가 다른 판인가.
   bool get hasMixedCapacities {
@@ -154,6 +179,38 @@ class LevelConfig {
     // 2개에서 1개로 떨어지는 것이 계단이 아니라 절벽이었다. 실제로 어머니가
     // 그 언저리에서 막히셨다. 그 구간은 [_lastBandStart] 뒤로 옮겼다.
     // 없앤 것이 아니라 **가장 어려운 곳**으로 자리를 바꾼 것이다.
+  ];
+
+  /// 501~700 — 병마다 높이가 다른 구간.
+  ///
+  /// `[이 레벨까지, 색 수, 기준 깊이, 색 병 높이들, 빈 병 높이들]`
+  ///
+  /// 색과 깊이는 500에서 천장에 닿았는데, 예전에는 거기서 **빈 병을 2개에서
+  /// 1개로** 줄여 난이도를 올렸다. 그게 계단이 아니라 절벽이라 어머니가
+  /// 그 언저리에서 막히셨다. 그 구간은 2801~로 옮겼다.
+  ///
+  /// 대신 여기서는 **병 높이를 섞는다.** 색 하나가 제 병을 정확히 채운다는
+  /// 약속은 그대로이므로, 병 높이가 곧 그 색의 칸 수다. 4칸 병에 담을 색은
+  /// 4칸, 6칸 병에 담을 색은 6칸이다.
+  ///
+  /// 색은 19가지로 늘렸고 병도 18개에서 21개로 늘어난다. 500(색15 병17)에서
+  /// 판이 작아지지 않는다. **줄어든 것처럼 보이면 퇴행으로 느껴지기 때문이다.**
+  /// 난이도는 조각 수로 잰다 — 501에서 44, 700에서 62로 오른다.
+  /// (해답 길이는 탐색기의 운을 재는 값이라 쓰지 않는다.)
+  static const List<List<Object>> _mixedTiers = [
+    // 병 높이를 낮춰 쉽게 만들 수도 있었지만, 그러면 병이 뭉툭해져 보기에
+    // 나쁘다. 높이는 유지하고 **색 수와 병 개수**로 난이도를 잡는다.
+    // 501은 색12(2줄)로 시작해 580부터 색18(3줄)로 늘어난다.
+    // 빈 병은 **가장 큰 높이**로 준다. 작은 빈 병으로 시작하면 처음부터
+    // 숨 쉴 곳이 좁아, 뒤에서 좁혀 갈 여지가 없어진다.
+    [540, 12, 7, [6, 7], [7, 7]], //  501~ 540  병14 조각38
+    [580, 12, 8, [6, 7, 8], [8, 8]], //  541~ 580  병14 조각40
+    [620, 18, 7, [5, 6, 7], [7, 7]], //  581~ 620  병20 조각55
+    [660, 18, 8, [6, 7, 8], [8, 8]], //  621~ 660  병20 조각59
+    // 마지막 구간은 빈 병 하나가 작아진다. 큰 것 하나 + 작은 것 하나가
+    // 중간 두 개보다 어렵다(같은 빈칸 총량으로 네 번 비교해 모두 그랬다).
+    // 큰 병을 아껴 써야 하므로 빈 병 하나하나가 서로 다른 자원이 된다.
+    [700, 18, 8, [6, 7, 8], [8, 6]], //  661~ 700  병20 조각59
   ];
 
   /// 규칙 구간표. `[이 레벨까지, 색 수, 깊이, 빈 병 수, 격자, 규칙코드]`
@@ -302,6 +359,19 @@ class LevelConfig {
       }
     }
 
+    for (final t in _mixedTiers) {
+      if (level <= (t[0] as int)) {
+        return LevelConfig(
+          level: level,
+          colorCount: t[1] as int,
+          capacity: t[2] as int,
+          emptyBottles: (t[4] as List<int>).length,
+          colorCapacities: t[3] as List<int>,
+          emptyCapacities: t[4] as List<int>,
+        );
+      }
+    }
+
     for (final t in _ruleTiers) {
       if (level <= t[0]) {
         return LevelConfig(
@@ -323,6 +393,8 @@ class LevelConfig {
     if (level <= 100) return '보통';
     if (level <= 200) return '어려움';
     if (level <= 310) return '매우 어려움';
+    if (level <= 500) return '최고 난이도';
+    if (level <= 700) return '들쭉날쭉';
     if (level <= 700) return '최고 난이도';
     if (level <= 1300) return '이웃 제한';
     if (level <= 1600) return '전용 병';

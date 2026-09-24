@@ -12,8 +12,10 @@ void main() {
       // 701부터는 다르다. 새 규칙이 들어올 때 판을 잠시 줄였다가 다시 키운다.
       // 규칙과 크기를 한꺼번에 올리면 절벽이 되기 때문이다. 그래서 이 구간의
       // 깊이는 오르내린다. 그건 고장이 아니라 설계다.
+      // 501부터는 병마다 높이가 다르므로 이 불변식이 성립하지 않는다.
+      // 그 구간은 낮은 병과 높은 병을 섞는 것이 설계다.
       var prev = 0;
-      for (var lv = 1; lv <= 700; lv++) {
+      for (var lv = 1; lv <= 500; lv++) {
         final c = LevelConfig.forLevel(lv);
         expect(c.capacity, greaterThanOrEqualTo(prev), reason: '레벨 $lv에서 병이 얕아졌습니다.');
         prev = c.capacity;

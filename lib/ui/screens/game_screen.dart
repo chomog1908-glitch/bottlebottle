@@ -441,12 +441,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           for (final row in rows)
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
+                              // 키가 다른 병들을 **바닥에 맞춰 세운다.**
+                              // 가운데 정렬하면 짧은 병이 공중에 뜬 것처럼 보여
+                              // 어디가 병의 바닥인지 헷갈린다.
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 for (final i in row)
                                   BottleWidget(
                                     paintKey: _bottleKeys[i],
                                     contents: _visualContents(c, i),
-                                    capacity: c.state.capacity,
+                                    // 병마다 제 높이로 그린다. 판 전체의 높이로
+                                    // 그리면 4칸 병이 "5칸인데 한 칸 빈 병"처럼
+                                    // 보여, 가득 찬 병에 부으려다 안 되는 일이
+                                    // 생긴다. 그건 버그로 보인다.
+                                    capacity: c.state.capacityOf(i),
                                     width: metrics.bottleWidth,
                                     unitHeight: metrics.unitHeight,
                                     selected: c.selected == i,
@@ -554,7 +562,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             angle: angle,
             child: BottleWidget(
               contents: _visualContents(c, anim.from),
-              capacity: c.state.capacity,
+              capacity: c.state.capacityOf(anim.from),
               width: metrics.bottleWidth,
               unitHeight: metrics.unitHeight,
               showSymbols: widget.settings.showSymbols,
